@@ -1325,7 +1325,6 @@
 <section id="maintenance" style="display:none;">
     <div class="dashboard-header">
         <h2>Maintenance</h2>
-        <p class="subtitle">Categories, drug catalog, markup, promos, and loyalty point value. Selling price = unit cost × (1 + markup%).</p>
     </div>
 
     <div class="um-subnav" id="maintenanceSubnav">
@@ -1340,7 +1339,6 @@
             <div class="um-card-head">
                 <div>
                     <h3>Categories</h3>
-                    <p>Markup % is set on Pricing.</p>
                 </div>
                 <button type="button" class="add-btn" id="addCategoryBtn" style="background:#4BAA8B;"><i class="fas fa-plus"></i> Add Category</button>
             </div>
@@ -1406,7 +1404,6 @@
             <div class="um-card-head">
                 <div>
                     <h3>Drug Catalog</h3>
-                    <p>Search definitions, then print a barcode, edit, or archive. Stock lots stay on Inventory.</p>
                 </div>
                 <button type="button" class="um-add-btn" id="addDrugMasterBtn"><i class="fas fa-plus"></i> Define New Drug</button>
             </div>
@@ -1455,7 +1452,6 @@
             <div class="um-card-head">
                 <div>
                     <h3>Loyalty points discount</h3>
-                    <p>Ilagay kung magkano ang bawas sa bayad para sa <strong>1 loyalty point</strong>. Halimbawa: ₱0.30 = 10 points ay ₱3.00 off sa POS.</p>
                 </div>
             </div>
             <div class="maint-loyalty-row">
@@ -1472,7 +1468,6 @@
             <div class="um-card-head">
                 <div>
                     <h3>Promos</h3>
-                    <p>Applies at the cashier on the dates you set.</p>
                 </div>
                 <button type="button" id="addPromoBtn" class="add-btn" style="background:#4BAA8B;"><i class="fas fa-plus"></i> Create Promo</button>
             </div>
@@ -2754,10 +2749,10 @@
         if (!input || !preview) return;
         const peso = parseFloat(input.value);
         if (!isFinite(peso) || peso < 0.01) {
-            preview.textContent = 'Enter pesos off per point, e.g. 0.30';
+            preview.textContent = '';
             return;
         }
-        preview.textContent = `Customer with 10 points gets ₱${(peso * 10).toFixed(2)} off. 100 points = ₱${(peso * 100).toFixed(2)} off.`;
+        preview.textContent = `10 points = ₱${(peso * 10).toFixed(2)} off`;
     }
 
     window.loadLoyaltySettings = function () {
@@ -3812,10 +3807,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="text" id="new_copy_search" placeholder="Search generic, brand, or dosage" autocomplete="off">
                     <div class="drug-pick-list" id="new_copy_list" hidden></div>
                 </div>
-                <p class="barcode-hint">Copies the fields below. Change dosage if this is a new strength. Barcode stays blank so it can auto-generate.</p>
                 <label for="new_generic_name">Generic Name:</label>
                 <div class="drug-pick">
-                    <input type="text" id="new_generic_name" placeholder="Type a name. Matching catalog names appear below." maxlength="255" required autocomplete="off">
+                    <input type="text" id="new_generic_name" placeholder="Search name" maxlength="255" required autocomplete="off">
                     <div class="drug-pick-list" id="new_generic_list" hidden></div>
                 </div>
                 <p id="new_autofill_hint" class="barcode-hint" style="min-height:16px;"></p>
@@ -3842,7 +3836,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <option value="otc">OTC</option>
                     <option value="rx" selected>Needs Rx</option>
                 </select>
-                <p class="barcode-hint">OTC needs no prescription.</p>
                 <label for="new_procurement_type">Procurement:</label>
                 <select id="new_procurement_type" required>
                     <option value="">Select procurement</option>
@@ -3947,7 +3940,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <form id="addPromoForm">
                 <label for="promo_name">Promo Name:</label>
-                <input type="text" id="promo_name" placeholder="e.g. Rainy Season Vitamin Sale" required>
+                <input type="text" id="promo_name" placeholder="Promo name" required>
 
                 <label for="promo_discount_type">Discount Type:</label>
                 <select id="promo_discount_type">
@@ -3970,7 +3963,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div id="promo_segment_field" style="display:none;">
                     <label for="promo_segment">Segment:</label>
                     <select id="promo_segment"></select>
-                    <p style="font-size:12px;color:#6b7280;margin:4px 0 8px;">Everyone in this group gets the discount on all products when they are selected at the cashier.</p>
                 </div>
 
                 <div id="promo_category_field" style="display:none;">
