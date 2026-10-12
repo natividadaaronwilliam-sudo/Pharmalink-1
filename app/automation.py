@@ -775,9 +775,7 @@ def create_auto_purchase_orders() -> dict:
         and s.get("auto_po", True)
     ]
     notes = (
-        "AUTO: generated from the Facebook Prophet demand forecast for the next 30 days. "
-        "Consignment medicines are included when the supplier is returnable or non-returnable. "
-        "Returnable near-expiry stock is not counted as stock to keep."
+        "This is an automatic order. PharmaLink prepared it from the stock we expect to need in the next 30 days."
     )
     result = create_purchase_orders_from_needs(needs, "System", notes, raise_alerts=True)
     from app.routers.admin_ops import send_saved_purchase_order

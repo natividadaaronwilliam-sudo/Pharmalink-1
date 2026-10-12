@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>PharmaLink System - Admin Portal</title>
-    <link rel="stylesheet" href="/assets/theme.css?v=push3">
-    <link rel="stylesheet" href="/admin/css/admin.css?v=mobile-fit1">
+    <link rel="stylesheet" href="/assets/theme.css?v=date-fit1">
+    <link rel="stylesheet" href="/admin/css/admin.css?v=dash-mobile2">
     <link rel="stylesheet" href="/shared/css/segmentation.css?v=palette-w4">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
     <style>
@@ -4994,6 +4994,13 @@ function renderSeasonalChart(labels, salesData) {
             },
             scales: {
                 y: { beginAtZero: true, ticks: { callback: v => '₱' + Number(v).toLocaleString('en-US') } },
+                x: {
+                    ticks: {
+                        maxRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: window.innerWidth < 760 ? 4 : 12,
+                    },
+                },
             },
         },
     });
@@ -5032,7 +5039,14 @@ function renderSalesCharts(labels, salesData, catLabels, catData) {
                     }
                 },
                 scales: {
-                    y: { beginAtZero: true, ticks: { callback: v => '₱' + Number(v).toLocaleString('en-US') } }
+                    y: { beginAtZero: true, ticks: { callback: v => '₱' + Number(v).toLocaleString('en-US') } },
+                    x: {
+                        ticks: {
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: window.innerWidth < 760 ? 4 : 12,
+                        },
+                    },
                 }
             }
         });
@@ -5058,7 +5072,10 @@ function renderSalesCharts(labels, salesData, catLabels, catData) {
                 maintainAspectRatio: false,
                 cutout: '62%',
                 plugins: {
-                    legend: { position: 'right' },
+                    legend: {
+                        position: window.innerWidth < 760 ? 'bottom' : 'right',
+                        labels: { boxWidth: 12, padding: 10, font: { size: 11 } },
+                    },
                     tooltip: {
                         ...chartTip,
                         displayColors: true,
