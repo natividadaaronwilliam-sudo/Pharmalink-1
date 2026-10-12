@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>PharmaLink System - Admin Portal</title>
-    <link rel="stylesheet" href="/assets/theme.css?v=date-fit1">
-    <link rel="stylesheet" href="/admin/css/admin.css?v=reports-mobile5">
-    <link rel="stylesheet" href="/shared/css/segmentation.css?v=palette-w4">
+    <link rel="stylesheet" href="/assets/theme.css?v=admin-mobile1">
+    <link rel="stylesheet" href="/admin/css/admin.css?v=admin-mobile1">
+    <link rel="stylesheet" href="/shared/css/segmentation.css?v=seg-mobile1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
     <style>
         /* Page-specific tweaks only - shared cards, tables, modals, buttons,
@@ -1376,12 +1376,12 @@
                     <tbody>
                         <tr>
                             <td>Senior / PWD discount</td>
-                            <td><input type="number" id="scPwdPercent" step="0.1" min="0" max="100" value="20" style="width:90px;padding:5px 8px;border:1px solid #ccc;border-radius:4px;"> %</td>
+                            <td><span class="maint-pct"><input type="number" id="scPwdPercent" step="0.1" min="0" max="100" value="20"> <span>%</span></span></td>
                             <td><button type="button" class="save-checkout-rate" data-rate="sc_pwd" style="background:#4BAA8B;color:#fff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;">Save</button></td>
                         </tr>
                         <tr>
                             <td>VAT</td>
-                            <td><input type="number" id="vatPercent" step="0.1" min="0" max="100" value="12" style="width:90px;padding:5px 8px;border:1px solid #ccc;border-radius:4px;"> %</td>
+                            <td><span class="maint-pct"><input type="number" id="vatPercent" step="0.1" min="0" max="100" value="12"> <span>%</span></span></td>
                             <td><button type="button" class="save-checkout-rate" data-rate="vat" style="background:#4BAA8B;color:#fff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;">Save</button></td>
                         </tr>
                     </tbody>
@@ -1824,7 +1824,7 @@
 </script>
 
 
-<script src="/assets/chart-colors.js?v=chart-colors2"></script>
+<script src="/assets/chart-colors.js?v=chart-colors3"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>window.SEGMENTATION_MANAGE = true;</script>
 <script src="/shared/js/segmentation.js?v=chart-colors1"></script>
@@ -4069,7 +4069,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
-    <script src="/admin/js/inventory.js?v=sale-class1"></script>
+    <script src="/admin/js/inventory.js?v=markup-pct1"></script>
     <script src="/admin/js/supplier.js?v=mobile-fit1"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
