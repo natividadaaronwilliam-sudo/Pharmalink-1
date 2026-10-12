@@ -521,11 +521,10 @@
 
     function paintViewOnlyChrome() {
         const sub = document.querySelector('#customer-segmentation-page .subtitle');
-        if (sub) {
-            sub.textContent = canManage()
-                ? 'You run the grouping here (how many segments) and can distribute loyalty points. Cashiers only see the result you set.'
-                : 'Read-only. These groups are set by Admin - you can view members, not change clustering or points.';
+        if (sub && canManage()) {
+            sub.textContent = 'You run the grouping here (how many segments) and can distribute loyalty points. Cashiers only see the result you set.';
         }
+        if (sub && !canManage()) sub.remove();
         const h2 = document.querySelector('#customer-segmentation-page .dashboard-header h2');
         if (h2 && !canManage() && !h2.querySelector('.cs-seg-viewonly')) {
             const badge = document.createElement('span');

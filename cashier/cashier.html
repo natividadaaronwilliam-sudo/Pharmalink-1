@@ -71,7 +71,6 @@
         <div class="cs-dash-header">
             <div class="dashboard-header">
                 <h2>Dashboard Overview</h2>
-                <p class="subtitle">Monitor daily sales, transactions, and inventory status.</p>
             </div>
             <div id="dashboard-datetime" class="cs-dash-clock">
                 <span>Today</span>
@@ -183,7 +182,6 @@
 <div id="pos-page" class="page">
     <div class="dashboard-header">
         <h2>Point of Sale</h2>
-        <p class="subtitle">Process transactions and manage customer purchases efficiently.</p>
     </div>
 
     <div class="pos-mode-selector">
@@ -227,7 +225,6 @@
 
             <div id="online-order-content" style="display: none;">
                 <h3>Online Orders Queue</h3>
-                <p class="subtitle">Review prescriptions, process orders, or load "Ready for Pickup" transactions.</p>
                 <div class="table-wrapper">
                     <table id="onlineOrdersTable" class="pos-inventory-table">
                         <thead>
@@ -325,7 +322,6 @@
                     <p class="pos-sum-line">Change: <span id="change">₱0.00</span></p>
                 </div>
                 <div id="ewalletPaymentFields" style="display:none;">
-                    <p class="pos-ewallet-hint">Click Confirm Sale. A QR appears with this total already inside it. When the customer scans it in GCash or Maya, the amount is filled in.</p>
                     <p class="pos-pay-qr-amt">₱<span id="ewalletTotalDisplay">0.00</span></p>
                 </div>
 
@@ -342,7 +338,7 @@
         </div>
         <div class="pos-pay-qr-box">
             <div id="posPayQr" aria-label="Customer payment QR code"></div>
-            <p class="pos-pay-qr-title">Scan this in the GCash or Maya app. The amount is already included.</p>
+            <p class="pos-pay-qr-title">Scan to pay.</p>
             <p class="pos-pay-qr-amt">₱<span id="ewalletModalTotal">0.00</span></p>
             <p id="ewalletPayStatus" class="pos-ewallet-hint">Creating the payment QR...</p>
         </div>
@@ -370,7 +366,6 @@
 
   <div class="dashboard-header">
     <h2>Customer Segmentation</h2>
-    <p class="subtitle">Read-only. These groups are set by Admin - you can view members, not change clustering or points.</p>
   </div>
 
   <div class="cs-seg-stats">
@@ -470,7 +465,6 @@
 <div id="sales-report-page" class="page">
     <div class="dashboard-header">
         <h2>Sales Report &amp; Transaction Logs</h2>
-        <p class="subtitle">Review completed POS sales, payment method, and transaction details.</p>
     </div>
 
     <div class="date-filter-container cs-dash-toolbar sr-toolbar">
@@ -708,7 +702,7 @@
 <script src="/assets/profile-validate.js?v=pv4"></script>
 <script src="/cashier/js/cashier-boot.js?v=header-first1"></script>
 <script>window.SEGMENTATION_MANAGE = false;</script>
-<script src="/shared/js/segmentation.js?v=chart-colors1"></script>
+<script src="/shared/js/segmentation.js?v=pos-copy1"></script>
 <script>
 // =======================================================
 // 1. GLOBAL VARIABLES & CONSTANTS (Available to ALL functions)
