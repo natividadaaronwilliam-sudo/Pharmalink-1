@@ -16,7 +16,7 @@ Contract (stdin -> stdout, both JSON):
       ]
     }
     Three RFM-style features are used per customer:
-      - monetary:     total amount spent (from completed/placed orders)
+      - monetary:     total spent on online orders plus walk-in sales linked to the customer
       - frequency:    number of orders placed
       - recency_days: days since the customer's most recent order
                       (a large placeholder, e.g. 9999, is used for

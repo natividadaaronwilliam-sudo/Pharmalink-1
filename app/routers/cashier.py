@@ -805,38 +805,62 @@ def dashboard(request: Request, startDate: str = "", endDate: str = ""):
     }
 
 
+def _customer_purchase_rows():
+    """Online orders plus walk-in sales the cashier linked to a customer.
+
+    A sale that completes an online order is skipped so that order is not counted twice.
+    """
+    return fetch_all(
+        """
+        SELECT c.customer_id,
+               CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+               c.loyalty_points,
+               COALESCE(o.total_spent, 0) + COALESCE(w.total_spent, 0) AS total_spent,
+               COALESCE(o.order_count, 0) + COALESCE(w.order_count, 0) AS order_count,
+               CASE
+                   WHEN o.last_order_date IS NULL THEN w.last_sale_date
+                   WHEN w.last_sale_date IS NULL THEN o.last_order_date
+                   ELSE GREATEST(o.last_order_date, w.last_sale_date)
+               END AS last_order_date
+        FROM customers c
+        LEFT JOIN (
+            SELECT customer_id,
+                   COALESCE(SUM(total_amount), 0) AS total_spent,
+                   COUNT(order_id) AS order_count,
+                   MAX(order_date) AS last_order_date
+            FROM customer_orders
+            GROUP BY customer_id
+        ) o ON o.customer_id = c.customer_id
+        LEFT JOIN (
+            SELECT customer_id,
+                   COALESCE(SUM(total_amount), 0) AS total_spent,
+                   COUNT(sale_id) AS order_count,
+                   MAX(date_created) AS last_sale_date
+            FROM sales
+            WHERE LOWER(TRIM(COALESCE(status, ''))) = 'completed'
+              AND online_order_id IS NULL
+              AND customer_id IS NOT NULL
+            GROUP BY customer_id
+        ) w ON w.customer_id = c.customer_id
+        ORDER BY total_spent DESC, customer_name
+        """
+    )
+
+
 @router.get("/charts")
 def charts(request: Request):
     if not require_staff(request):
         return _unauthorized()
-    freq_rows = fetch_all(
-        """
-        SELECT CONCAT(c.first_name, ' ', c.last_name) AS fullname, COUNT(o.order_id) AS order_count
-        FROM customers c
-        LEFT JOIN customer_orders o ON c.customer_id = o.customer_id
-        GROUP BY c.customer_id, c.first_name, c.last_name
-        ORDER BY order_count DESC
-        """
-    )
-    spend_rows = fetch_all(
-        """
-        SELECT c.customer_id, CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
-               c.loyalty_points, SUM(co.total_amount) AS total_spent,
-               COUNT(co.order_id) AS order_count, MAX(co.order_date) AS last_order_date
-        FROM customers c
-        LEFT JOIN customer_orders co ON c.customer_id = co.customer_id
-        GROUP BY c.customer_id, c.first_name, c.last_name, c.loyalty_points
-        ORDER BY total_spent DESC
-        """
-    )
+    rows = _customer_purchase_rows()
+    by_frequency = sorted(rows, key=lambda r: (-int(r["order_count"] or 0), r["customer_name"] or ""))
     type_rows = fetch_all(
         "SELECT customer_type, COUNT(*) as total FROM customers WHERE is_active = 1 GROUP BY customer_type"
     )
     return {
-        "freq_labels": [r["fullname"] for r in freq_rows],
-        "freq_data": [int(r["order_count"] or 0) for r in freq_rows],
-        "spend_labels": [r["customer_name"] for r in spend_rows],
-        "spend_data": [float(r["total_spent"] or 0) for r in spend_rows],
+        "freq_labels": [r["customer_name"] for r in by_frequency],
+        "freq_data": [int(r["order_count"] or 0) for r in by_frequency],
+        "spend_labels": [r["customer_name"] for r in rows],
+        "spend_data": [float(r["total_spent"] or 0) for r in rows],
         "type_labels": [r["customer_type"] for r in type_rows],
         "type_data": [int(r["total"] or 0) for r in type_rows],
     }
@@ -1222,17 +1246,7 @@ async def update_profile(request: Request):
 def segmentation(request: Request):
     if not require_staff(request):
         return _unauthorized()
-    spend_rows = fetch_all(
-        """
-        SELECT c.customer_id, CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
-               c.loyalty_points, SUM(co.total_amount) AS total_spent,
-               COUNT(co.order_id) AS order_count, MAX(co.order_date) AS last_order_date
-        FROM customers c
-        LEFT JOIN customer_orders co ON c.customer_id = co.customer_id
-        GROUP BY c.customer_id, c.first_name, c.last_name, c.loyalty_points
-        ORDER BY total_spent DESC
-        """
-    )
+    spend_rows = _customer_purchase_rows()
     spend_customers = []
     spend_data = []
     now = datetime.now()
