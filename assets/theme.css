@@ -1121,3 +1121,27 @@ button:focus-visible, .nav-item:focus-visible, a:focus-visible{
 .ph-push-enable:hover{ background:#FFC857 !important; color:#1E3A34 !important; }
 .ph-push-later,
 .ph-push-later:hover{ background:transparent !important; color:#FFF7E6 !important; box-shadow:none !important; }
+
+/* Phone date fields ignore width unless the native look is turned off. */
+@media (max-width: 900px){
+  input[type="date"]{
+    -webkit-appearance:none;
+    appearance:none;
+    display:block;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    box-sizing:border-box !important;
+    text-align:left;
+  }
+  input[type="date"]::-webkit-date-and-time-value{
+    text-align:left;
+    margin:0;
+    min-width:0;
+  }
+  input[type="date"]::-webkit-datetime-edit{
+    display:inline-block;
+    min-width:0;
+    padding:0;
+  }
+}

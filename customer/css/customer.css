@@ -499,7 +499,7 @@ html, body {
     #prescription .rx-filters label{ width:100%; max-width:100%; }
     #prescription .rx-filters input,
     #prescription .rx-filter-btn{
-        display:block; width:100% !important; min-width:0 !important; max-width:100%;
+        display:block; width:100% !important; min-width:0 !important; max-width:100% !important;
         box-sizing:border-box;
     }
     .rx-stock-row{ grid-template-columns:minmax(0, 1fr) auto; }
@@ -693,16 +693,24 @@ html, body {
 }
 .mo-pay-qr p{ margin:8px 0 0; color:#1E3A34; font-size:.85rem; line-height:1.4; }
 @media (max-width: 960px){
-    #orders .mo-filters{ grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); }
-    #orders .mo-search, #orders .mo-filter-btn{ grid-column:1 / -1; }
+    #orders .mo-filters{ grid-template-columns:minmax(0, 1fr); width:100%; min-width:0; max-width:100%; }
+    #orders .mo-filters label{ width:100%; max-width:100%; }
+    #orders .mo-filters input,
+    #orders .mo-filter-btn{
+        display:block; width:100% !important; min-width:0 !important; max-width:100% !important;
+        box-sizing:border-box;
+    }
+    #orders .mo-search, #orders .mo-filter-btn{ grid-column:auto; }
 }
 @media (max-width: 720px){
     #orders .mo-stats{ grid-template-columns:1fr; }
+    #orders .mo-toolbar,
+    #orders .mo-filters{ width:100%; min-width:0; max-width:100%; }
     #orders .mo-filters{ grid-template-columns:minmax(0, 1fr); }
-    #orders .mo-filters label{ width:100%; }
+    #orders .mo-filters label{ width:100%; max-width:100%; }
     #orders .mo-filters input,
     #orders .mo-filter-btn{
-        display:block; width:100% !important; min-width:0 !important; max-width:100%;
+        display:block; width:100% !important; min-width:0 !important; max-width:100% !important;
         box-sizing:border-box;
     }
     #orders .mo-search, #orders .mo-filter-btn{ grid-column:auto; }

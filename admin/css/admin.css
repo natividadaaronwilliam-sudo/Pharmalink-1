@@ -943,16 +943,20 @@ button.drug-pick-item.is-active{
   #dashboard .ad-dash-toolbar{ align-items:stretch; }
   #dashboard .ad-dash-dates,
   #activity-logs .ad-dash-dates{
-    display:grid; grid-template-columns:1fr; gap:10px; width:100%;
+    display:grid; grid-template-columns:minmax(0, 1fr); gap:10px;
+    width:100%; min-width:0; max-width:100%;
   }
   #dashboard .ad-dash-dates label,
-  #activity-logs .ad-dash-dates label{ width:100%; min-width:0; }
-  #dashboard .ad-dash-dates input[type="date"],
-  #activity-logs .ad-dash-dates input[type="date"]{
-    width:100%; min-width:0; box-sizing:border-box;
+  #activity-logs .ad-dash-dates label{
+    width:100%; min-width:0; max-width:100%;
   }
+  #dashboard .ad-dash-dates input[type="date"],
+  #activity-logs .ad-dash-dates input[type="date"],
   #dashboard #dash-apply-filter,
-  #activity-logs #activity-apply{ width:100% !important; }
+  #activity-logs #activity-apply{
+    display:block; width:100% !important; min-width:0 !important; max-width:100% !important;
+    box-sizing:border-box;
+  }
   #supplier-section .table-wrap{ overflow:visible; }
   #supplier-section .sup-table{
     display:block; table-layout:auto; border-collapse:separate; border-spacing:0 10px;

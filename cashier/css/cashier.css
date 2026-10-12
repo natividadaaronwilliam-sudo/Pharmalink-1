@@ -133,8 +133,13 @@
 @media (max-width: 900px){
     #dashboard-page .cs-dash-stats{ grid-template-columns:1fr 1fr; }
     #dashboard-page .cs-dash-grid{ grid-template-columns:1fr; }
-    #dashboard-page .cs-dash-toolbar{ grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); }
-    #dashboard-page #applyFilterBtn{ grid-column:1 / -1; width:100% !important; }
+    #dashboard-page .cs-dash-toolbar{ grid-template-columns:minmax(0, 1fr); width:100%; min-width:0; max-width:100%; }
+    #dashboard-page .cs-dash-toolbar label{ width:100%; max-width:100%; }
+    #dashboard-page .cs-dash-toolbar input[type="date"],
+    #dashboard-page #applyFilterBtn{
+        display:block; grid-column:auto; width:100% !important; min-width:0 !important; max-width:100% !important;
+        box-sizing:border-box;
+    }
 }
 @media (max-width: 560px){
     #dashboard-page .cs-dash-stats{ grid-template-columns:1fr; }
@@ -588,9 +593,12 @@
     #dashboard-page .cs-dash-clock{ width:100%; min-width:0; }
     #dashboard-page .cs-dash-toolbar,
     #dashboard-page .cs-dash-stats{ grid-template-columns:minmax(0, 1fr); }
+    #dashboard-page .cs-dash-toolbar{ width:100%; min-width:0; max-width:100%; }
+    #dashboard-page .cs-dash-toolbar label{ width:100%; max-width:100%; }
     #dashboard-page .cs-dash-toolbar input[type="date"],
     #dashboard-page #applyFilterBtn{
-        width:100% !important; min-width:0 !important; max-width:100%; box-sizing:border-box;
+        display:block; width:100% !important; min-width:0 !important; max-width:100% !important;
+        box-sizing:border-box;
     }
 
     #pos-page .pos-mode-selector{ display:grid; grid-template-columns:1fr; }
@@ -602,11 +610,15 @@
     #pos-page .filter-row select,
     #pos-page #scanBarcodeBtn{ width:100% !important; min-width:0; }
 
-    #sales-report-page .sr-toolbar{ grid-template-columns:minmax(0, 1fr); }
+    #sales-report-page .sr-toolbar{
+        grid-template-columns:minmax(0, 1fr); width:100%; min-width:0; max-width:100%;
+    }
+    #sales-report-page .sr-toolbar label{ width:100%; max-width:100%; }
     #sales-report-page .sr-toolbar input,
     #sales-report-page .sr-toolbar select,
     #sales-report-page .sr-toolbar button{
-        width:100% !important; min-width:0 !important; max-width:100%; box-sizing:border-box;
+        display:block; width:100% !important; min-width:0 !important; max-width:100% !important;
+        box-sizing:border-box;
     }
 
     #customer-segmentation-page .cs-seg-stats,
