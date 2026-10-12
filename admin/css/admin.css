@@ -940,10 +940,17 @@ button.drug-pick-item.is-active{
   #deliveries .controls select,
   #deliveries #createPoBtn{ width:100% !important; }
   #deliveries #createPoBtn{ justify-content:center; }
-  #dashboard .ad-dash-toolbar{ align-items:stretch; }
+  #dashboard .ad-dash-toolbar{
+    display:flex; flex-direction:column; align-items:stretch; gap:10px;
+    width:100%; min-width:0; max-width:100%;
+  }
+  #dashboard .ad-dash-presets{
+    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); width:100%; gap:8px;
+  }
+  #dashboard .ad-dash-preset{ width:100% !important; }
   #dashboard .ad-dash-dates,
   #activity-logs .ad-dash-dates{
-    display:grid; grid-template-columns:minmax(0, 1fr); gap:10px;
+    display:grid; grid-template-columns:minmax(0, 1fr); gap:12px;
     width:100%; min-width:0; max-width:100%;
   }
   #dashboard .ad-dash-dates label,
@@ -957,17 +964,26 @@ button.drug-pick-item.is-active{
     display:block; width:100% !important; min-width:0 !important; max-width:100% !important;
     box-sizing:border-box;
   }
+  #dashboard .ad-dash-charts{ grid-template-columns:minmax(0, 1fr); }
+  #dashboard .ad-dash-card{ min-width:0; max-width:100%; overflow:hidden; }
+  #dashboard .ad-dash-chart{ height:280px; width:100%; max-width:100%; overflow:hidden; }
+  #dashboard .ad-dash-chart-pie{ height:340px; }
+  #dashboard .ad-dash-chart canvas{
+    display:block; width:100% !important; height:100% !important; max-height:none !important;
+  }
   #supplier-section .table-wrap{ overflow:visible; }
   #supplier-section .sup-table{
-    display:block; table-layout:auto; border-collapse:separate; border-spacing:0 10px;
+    display:block; table-layout:auto; border-collapse:separate; border-spacing:0;
   }
   #supplier-section .sup-table thead{ display:none; }
   #supplier-section .sup-table tbody,
   #supplier-section .sup-table tr,
   #supplier-section .sup-table td{ display:block; width:100% !important; }
   #supplier-section .sup-table tr{
-    border:1px solid #FFE3B3; border-radius:12px; padding:10px 12px; background:#fff;
+    border:1px solid #FFE3B3; border-radius:14px; padding:16px 16px;
+    margin:0 0 16px; background:#fff;
   }
+  #supplier-section .sup-table tr:last-child{ margin-bottom:0; }
   #supplier-section .sup-table td{
     display:flex; justify-content:space-between; align-items:center; gap:12px;
     padding:6px 0; border:0; text-align:right;
