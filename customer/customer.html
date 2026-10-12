@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PharmaLink - Customer Portal</title>
     <link rel="stylesheet" href="/assets/theme.css?v=push3">
-    <link rel="stylesheet" href="/customer/css/customer.css?v=cancel-pending1">
+    <link rel="stylesheet" href="/customer/css/customer.css?v=mobile-fit2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -136,19 +136,23 @@
         <i class="fas fa-search"></i>
         <input type="text" id="searchInput" placeholder="Search by brand, generic name, or form..." autocomplete="off">
     </div>
-    <label class="shop-cat-label" for="categoryFilter">Category</label>
-    <select id="categoryFilter">
-        <option value="">All Categories</option>
-    </select>
-    <label class="shop-cat-label" for="productSort">Sort</label>
-    <select id="productSort">
-        <option value="name-asc">Name A–Z</option>
-        <option value="name-desc">Name Z–A</option>
-        <option value="price-asc">Price: Low to high</option>
-        <option value="price-desc">Price: High to low</option>
-        <option value="stock-asc">Stock: Low to high</option>
-        <option value="stock-desc">Stock: High to low</option>
-    </select>
+    <div class="shop-field">
+        <label class="shop-cat-label" for="categoryFilter">Category</label>
+        <select id="categoryFilter">
+            <option value="">All Categories</option>
+        </select>
+    </div>
+    <div class="shop-field">
+        <label class="shop-cat-label" for="productSort">Sort</label>
+        <select id="productSort">
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+            <option value="price-asc">Price: Low to high</option>
+            <option value="price-desc">Price: High to low</option>
+            <option value="stock-asc">Stock: Low to high</option>
+            <option value="stock-desc">Stock: High to low</option>
+        </select>
+    </div>
 </div>
 <div class="products-container">
     <div class="product-grid-wrapper">

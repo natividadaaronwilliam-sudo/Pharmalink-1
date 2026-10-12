@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PharmaLink System - Cashier/Pharmacist Dashboard</title>
     <link rel="stylesheet" href="/assets/theme.css?v=push3">
-    <link rel="stylesheet" href="/cashier/css/cashier.css?v=dash-pager1">
+    <link rel="stylesheet" href="/cashier/css/cashier.css?v=cashier-mobile1">
     <link rel="stylesheet" href="/shared/css/segmentation.css?v=palette-w4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -3058,7 +3058,18 @@ function renderTopMedicinesChart(start, end) {
                     animation: { duration: 600, easing: 'easeOutQuart' },
                     scales: {
                         x: { beginAtZero: true, title: { display: true, text: 'Units Sold' }, grid: { color: '#eef2f7' } },
-                        y: { grid: { display: false }, ticks: { color: '#4BAA8B', font: { size: 12 } } }
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#4BAA8B',
+                                font: { size: 11 },
+                                callback: function (value) {
+                                    const label = String(this.getLabelForValue(value) || '');
+                                    const max = window.innerWidth < 720 ? 16 : 28;
+                                    return label.length > max ? label.slice(0, max - 1) + '…' : label;
+                                }
+                            }
+                        }
                     },
                     plugins: {
                         legend: { display: false },

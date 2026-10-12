@@ -31,10 +31,10 @@
         return `
         <tr data-id="${s.supplier_id}">
             <td class="sup-name">${escapeHtml(s.supplier_name)}</td>
-            <td class="sup-contact" title="${escapeHtml(contact)}">${escapeHtml(contact)}</td>
-            <td>${statusBadge(s.status)}</td>
-            <td><button type="button" class="sup-count" title="${escapeHtml(tip)}" aria-label="Show medicines">${countLabel}</button></td>
-            <td>
+            <td class="sup-contact" data-label="Contact" title="${escapeHtml(contact)}">${escapeHtml(contact)}</td>
+            <td data-label="Status">${statusBadge(s.status)}</td>
+            <td data-label="Medicines"><button type="button" class="sup-count" title="${escapeHtml(tip)}" aria-label="Show medicines">${countLabel}</button></td>
+            <td data-label="Actions">
                 <div class="sup-actions">
                     <button type="button" class="um-btn um-btn-edit edit-supplier-btn" title="Edit" aria-label="Edit"><i class="fas fa-pen"></i></button>
                     <button type="button" class="um-btn ${isActive ? 'um-btn-danger' : 'um-btn-activate'} toggle-supplier-btn" title="${isActive ? 'Deactivate' : 'Reactivate'}" aria-label="${isActive ? 'Deactivate' : 'Reactivate'}">

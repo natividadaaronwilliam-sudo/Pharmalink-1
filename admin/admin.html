@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>PharmaLink System - Admin Portal</title>
     <link rel="stylesheet" href="/assets/theme.css?v=push3">
-    <link rel="stylesheet" href="/admin/css/admin.css?v=chart-tips1">
+    <link rel="stylesheet" href="/admin/css/admin.css?v=mobile-fit1">
     <link rel="stylesheet" href="/shared/css/segmentation.css?v=palette-w4">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
     <style>
@@ -25,19 +25,24 @@
         .modal-content.modal-wide{ width:1080px; max-width:96%; }
         .report-hub{
             display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
-            gap:14px; margin-top:8px;
+            gap:14px; margin-top:8px; align-items:stretch;
         }
         .report-hub-card{
+            display:flex; flex-direction:column; height:100%;
             text-align:left; background:#fff; border:1px solid #e5e7eb; border-radius:12px;
             padding:18px 18px 16px; box-shadow:0 2px 8px rgba(15,23,42,0.05);
         }
         .report-hub-card:hover{ border-color:#FFC857; box-shadow:0 6px 18px rgba(37,99,235,0.12); }
-        .report-hub-card h3{ margin:0 0 6px; font-size:16px; color:#1E3A34; }
-        .report-hub-card .hub-hint{ margin:0; color:#6b7280; font-size:13px; line-height:1.4; }
+        .report-hub-card h3{
+            margin:0 0 6px; font-size:16px; line-height:1.25; min-height:2.5em;
+            color:#1E3A34;
+        }
+        .report-hub-card .hub-hint{ margin:0; min-height:1.4em; color:#6b7280; font-size:13px; line-height:1.4; }
         .report-hub-card .hub-value{ display:block; margin:12px 0 2px; font-size:1.55rem; font-weight:700; }
         .report-hub-card .hub-actions, .rpt-export-row{
             display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; align-items:center;
         }
+        .report-hub-card .hub-actions{ margin-top:auto; padding-top:12px; }
         .modal-header .rpt-export-row{ margin-top:0; }
         #forecast .forecast-controls{
             display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:22px; width:100%;
@@ -1159,6 +1164,7 @@
         <div class="report-hub-card" title="Procurement cost. Medicine still in the store. Expired stock is left out. The amount is what you paid for it.">
             <h3><i class="fas fa-file-invoice-dollar"></i> Cost of stock on hand</h3>
             <span class="hub-value" id="hub-procurement-cost" style="color:#1E3A34;">₱0</span>
+            <p class="hub-hint" aria-hidden="true">&nbsp;</p>
             <div class="hub-actions">
                 <button type="button" class="rpt-btn navy" data-report-modal="procurementReportModal"><i class="fas fa-list"></i> Open</button>
                 <button type="button" class="rpt-btn pdf" data-rpt-kind="procurement" data-rpt-format="pdf"><i class="fas fa-file-pdf"></i> PDF</button>
@@ -4064,7 +4070,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="/admin/js/inventory.js?v=sale-class1"></script>
-    <script src="/admin/js/supplier.js?v=sup-meds4"></script>
+    <script src="/admin/js/supplier.js?v=mobile-fit1"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // Flag to ensure User Management events are initialized only once
