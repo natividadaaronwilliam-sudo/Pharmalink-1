@@ -857,7 +857,7 @@ function displayOrderDetails(data) {
     function syncPayHint() {
         const hint = document.getElementById('shopPayHint');
         if (!hint) return;
-        hint.textContent = 'Cash, GCash, and Maya all go to the cashier first. For GCash or Maya, a QR code appears once the order is Ready for Pickup so you can pay from home.';
+        hint.textContent = 'Pay at the cashier. QR appears when the order is ready.';
     }
 
 

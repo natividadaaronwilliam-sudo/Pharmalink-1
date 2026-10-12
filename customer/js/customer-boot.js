@@ -40,7 +40,7 @@
         }
 
         const script = document.createElement('script');
-        script.src = '/customer/js/customer.js?v=cancel-pending1';
+        script.src = '/customer/js/customer.js?v=shop-copy1';
         document.body.appendChild(script);
     });
 
