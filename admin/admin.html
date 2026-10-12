@@ -482,7 +482,6 @@
             <section id="inventory" style="display:none;">
                 <div class="dashboard-header">
                     <h2>Inventory Management</h2>
-                    <p class="subtitle">View lots and adjust stock. New stock is added when you receive a delivery. Drug definitions live under Maintenance.</p>
                 </div>
 
                 <div class="inv-subnav">
@@ -759,7 +758,6 @@
 <section id="user-management" style="display:none;">
     <div class="dashboard-header">
         <h2>User Management</h2>
-        <p class="subtitle">Manage admin, cashier, and customer accounts.</p>
     </div>
 
     <div class="um-subnav">
@@ -909,7 +907,6 @@
 <section id="supplier-section" style="display:none;">
     <div class="dashboard-header">
         <h2>Suppliers</h2>
-        <p class="subtitle">The list stays one line per supplier. Click the medicine count to see the list.</p>
     </div>
 
     <div class="um-card">
@@ -956,7 +953,6 @@
 <section id="deliveries" style="display:none;">
     <div class="dashboard-header">
         <h2>Deliveries from Suppliers</h2>
-        <p class="subtitle">Create a Purchase Order for a supplier, then receive the delivery when it arrives - this is what actually adds stock lots to Inventory.</p>
     </div>
 
     <div class="controls">
@@ -1052,7 +1048,6 @@
         <p id="viewPoMeta" style="color:var(--ph-text-soft); margin-top:-10px;"></p>
 
         <h3 style="margin-top:20px;">Receive Delivery</h3>
-        <p style="font-size:13px;color:var(--ph-text-soft);">Scan a product barcode to jump to that PO line and fill lot, expiration, and cost when known (last lot from this supplier, PO unit cost, or GS1 lot/expiry on the scan). Invoice / reference number is required. Selling price is filled from category markup.</p>
 
         <div style="display:flex; gap:10px;">
             <div class="form-group" style="flex:1;">
@@ -1081,7 +1076,6 @@
             <section id="forecast" style="display:none;">
     <div class="dashboard-header">
         <h2>Forecast</h2>
-        <p class="subtitle">Predicted sales from historical data. Pick a period, then generate. PDF and Excel export the same view.</p>
     </div>
 
 <div class="forecast-controls">
@@ -1137,7 +1131,6 @@
             <section id="reports" style="display:none;">
     <div class="dashboard-header">
         <h2>Reports</h2>
-        <p class="subtitle">See pieces sold, what stock cost, or money tied up in medicine that is expiring.</p>
     </div>
 
     <div class="rpt-upload-card" title="Excel or CSV of past sales. Use the template, and match the medicine names already in the store. Stock on the shelf does not change.">
@@ -1332,7 +1325,6 @@
 <section id="maintenance" style="display:none;">
     <div class="dashboard-header">
         <h2>Maintenance</h2>
-        <p class="subtitle">Categories, drug catalog, markup, promos, and loyalty point value. Selling price = unit cost × (1 + markup%).</p>
     </div>
 
     <div class="um-subnav" id="maintenanceSubnav">
@@ -1347,7 +1339,6 @@
             <div class="um-card-head">
                 <div>
                     <h3>Categories</h3>
-                    <p>Add a category here, then pick it when you define a drug. Markup % is still set on Pricing.</p>
                 </div>
                 <button type="button" class="add-btn" id="addCategoryBtn" style="background:#4BAA8B;"><i class="fas fa-plus"></i> Add Category</button>
             </div>
@@ -1370,7 +1361,7 @@
             <div class="um-card-head">
                 <div>
                     <h3>Checkout rates</h3>
-                    <p>Percents used at the cashier. Senior / PWD removes VAT, then takes this discount. VAT is the tax inside a regular sale.</p>
+                    <p>Senior / PWD removes VAT, then applies this discount.</p>
                 </div>
             </div>
             <div class="table-wrap">
@@ -1396,7 +1387,7 @@
             <div class="um-card-head">
                 <div>
                     <h3>Category markup</h3>
-                    <p>Set markup % per category. Save updates selling price on every lot in that category that has a unit cost. Lots with no cost are skipped. Receive still uses the same formula; you cannot type a different selling price on delivery.</p>
+                    <p>Markup % per category. Save updates the selling price.</p>
                 </div>
             </div>
             <div class="table-wrap">
@@ -1413,7 +1404,6 @@
             <div class="um-card-head">
                 <div>
                     <h3>Drug Catalog</h3>
-                    <p>Search definitions, then print a barcode, edit, or archive. Stock lots stay on Inventory.</p>
                 </div>
                 <button type="button" class="um-add-btn" id="addDrugMasterBtn"><i class="fas fa-plus"></i> Define New Drug</button>
             </div>
@@ -1462,7 +1452,6 @@
             <div class="um-card-head">
                 <div>
                     <h3>Loyalty points discount</h3>
-                    <p>Ilagay kung magkano ang bawas sa bayad para sa <strong>1 loyalty point</strong>. Halimbawa: ₱0.30 = 10 points ay ₱3.00 off sa POS.</p>
                 </div>
             </div>
             <div class="maint-loyalty-row">
@@ -1479,7 +1468,6 @@
             <div class="um-card-head">
                 <div>
                     <h3>Promos</h3>
-                    <p>Percent-off or fixed peso discounts for a drug, a category, the whole store, or one customer segment. They apply at Cashier within the date range you set.</p>
                 </div>
                 <button type="button" id="addPromoBtn" class="add-btn" style="background:#4BAA8B;"><i class="fas fa-plus"></i> Create Promo</button>
             </div>
@@ -1505,7 +1493,6 @@
 <section id="activity-logs" style="display:none;">
     <div class="dashboard-header">
         <h2>Activity Logs</h2>
-        <p class="subtitle">Create, update, delete, and other major actions.</p>
     </div>
     <div class="ad-dash-toolbar">
         <div class="um-search">
@@ -2762,10 +2749,10 @@
         if (!input || !preview) return;
         const peso = parseFloat(input.value);
         if (!isFinite(peso) || peso < 0.01) {
-            preview.textContent = 'Enter pesos off per point, e.g. 0.30';
+            preview.textContent = '';
             return;
         }
-        preview.textContent = `Customer with 10 points gets ₱${(peso * 10).toFixed(2)} off. 100 points = ₱${(peso * 100).toFixed(2)} off.`;
+        preview.textContent = `10 points = ₱${(peso * 10).toFixed(2)} off`;
     }
 
     window.loadLoyaltySettings = function () {
@@ -3820,10 +3807,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="text" id="new_copy_search" placeholder="Search generic, brand, or dosage" autocomplete="off">
                     <div class="drug-pick-list" id="new_copy_list" hidden></div>
                 </div>
-                <p class="barcode-hint">Copies the fields below. Change dosage if this is a new strength. Barcode stays blank so it can auto-generate.</p>
                 <label for="new_generic_name">Generic Name:</label>
                 <div class="drug-pick">
-                    <input type="text" id="new_generic_name" placeholder="Type a name. Matching catalog names appear below." maxlength="255" required autocomplete="off">
+                    <input type="text" id="new_generic_name" placeholder="Search name" maxlength="255" required autocomplete="off">
                     <div class="drug-pick-list" id="new_generic_list" hidden></div>
                 </div>
                 <p id="new_autofill_hint" class="barcode-hint" style="min-height:16px;"></p>
@@ -3850,7 +3836,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <option value="otc">OTC</option>
                     <option value="rx" selected>Needs Rx</option>
                 </select>
-                <p class="barcode-hint">OTC can be sold without a prescription. Needs Rx is for prescription medicines.</p>
                 <label for="new_procurement_type">Procurement:</label>
                 <select id="new_procurement_type" required>
                     <option value="">Select procurement</option>
@@ -3862,7 +3847,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="text" id="new_barcode" placeholder="Scan, type, or leave blank to auto-generate" autocomplete="off" maxlength="64">
                     <button type="button" id="scanNewBarcodeBtn"><i class="fas fa-barcode"></i> Scan</button>
                 </div>
-                <p class="barcode-hint">Leave blank to auto-generate. USB scanner or Scan for camera.</p>
                 <button type="submit" style="background: #4BAA8B;" class="save"><i class="fas fa-plus"></i> Create Drug Definition</button>
             </form>
         </div>
@@ -3956,7 +3940,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <form id="addPromoForm">
                 <label for="promo_name">Promo Name:</label>
-                <input type="text" id="promo_name" placeholder="e.g. Rainy Season Vitamin Sale" required>
+                <input type="text" id="promo_name" placeholder="Promo name" required>
 
                 <label for="promo_discount_type">Discount Type:</label>
                 <select id="promo_discount_type">
@@ -3979,7 +3963,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div id="promo_segment_field" style="display:none;">
                     <label for="promo_segment">Segment:</label>
                     <select id="promo_segment"></select>
-                    <p style="font-size:12px;color:#6b7280;margin:4px 0 8px;">Everyone in this group gets the discount on all products when they are selected at the cashier.</p>
                 </div>
 
                 <div id="promo_category_field" style="display:none;">
