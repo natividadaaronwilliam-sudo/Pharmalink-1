@@ -874,6 +874,20 @@ body.customer-guest #customerNotificationBell{ display:none !important; }
     #products .cart-mobile-bar:not([hidden]),
     .toast{ left:262px; }
 }
+@media (max-width: 720px){
+    #products .shop-toolbar{
+        display:grid;
+        grid-template-columns:88px minmax(0, 1fr);
+        align-items:center;
+        gap:10px 12px;
+    }
+    #products .shop-search{ grid-column:1 / -1; min-width:0; width:100%; }
+    #products .shop-cat-label{ margin:0; }
+    #products #categoryFilter,
+    #products #productSort{
+        width:100%; min-width:0; max-width:none; box-sizing:border-box;
+    }
+}
 @media (max-width: 900px){
     #products .cart-mobile-bar:not([hidden]),
     .toast{ left:12px; right:12px; }

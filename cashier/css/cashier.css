@@ -39,26 +39,28 @@
 #dashboard-page #live-clock{ margin-top:4px; font-size:14px; font-weight:700; color:#1E3A34; }
 #dashboard-page .cs-dash-toolbar{
     display:grid;
-    grid-template-columns:minmax(148px, 1fr) minmax(148px, 1fr) auto;
+    grid-template-columns:minmax(0, 1fr) minmax(0, 1fr) auto;
     align-items:end;
     gap:10px 12px;
     background:#fff; border:1px solid var(--ph-border-soft, #FFE3B3);
     border-radius:16px; padding:12px 14px; margin-bottom:18px;
     box-shadow:0 2px 8px rgba(23,26,43,.05);
+    min-width:0; max-width:100%;
 }
 #dashboard-page .cs-dash-toolbar label{
     font-size:12px; font-weight:700; color:#4b5563;
     display:flex; flex-direction:column; gap:6px;
-    min-width:0;
+    min-width:0; max-width:100%;
 }
 #dashboard-page .cs-dash-toolbar input[type="date"]{
-    width:100% !important; min-width:148px; height:40px; padding:0 10px;
+    display:block; width:100% !important; min-width:0 !important; max-width:100%;
+    height:40px; padding:0 10px;
     border:1px solid #FFE3B3; border-radius:8px; box-sizing:border-box;
 }
 #dashboard-page #applyFilterBtn{
     width:auto !important; margin:0 !important; height:40px;
     padding:0 16px !important; background:#1E3A34 !important;
-    box-shadow:none !important; white-space:nowrap;
+    box-shadow:none !important; white-space:nowrap; justify-content:center;
 }
 #dashboard-page .cs-dash-stats{
     grid-template-columns:repeat(3, minmax(0, 1fr));
@@ -79,17 +81,23 @@
 #dashboard-page .cs-icon-amber{ background:#FFC857; }
 #dashboard-page .cs-icon-red{ background:#ef4444; }
 #dashboard-page .cs-icon-violet{ background:#FFC857; }
-#dashboard-page .cs-dash-grid{ gap:16px; }
+#dashboard-page .cs-dash-grid{ gap:16px; min-width:0; }
 #dashboard-page .chart-card,
 #dashboard-page .table-card{
     border-radius:18px; padding:18px 16px;
     box-shadow:0 8px 24px rgba(23,26,43,.06);
+    min-width:0; max-width:100%; overflow:hidden;
 }
 #dashboard-page .chart-card h3,
 #dashboard-page .table-card h3{
     margin:0 0 14px; color:#1E3A34; font-size:1.05rem;
 }
-#dashboard-page .cs-chart-wrap{ height:280px; position:relative; }
+#dashboard-page .cs-chart-wrap{
+    height:280px; width:100%; max-width:100%; position:relative; overflow:hidden;
+}
+#dashboard-page .cs-chart-wrap canvas{
+    display:block; width:100% !important; height:100% !important; max-height:none !important;
+}
 #dashboard-page .table-wrapper{ overflow-x:auto; }
 #dashboard-page .table-card table{ width:100%; border-collapse:collapse; }
 #dashboard-page .table-card th{
@@ -125,8 +133,8 @@
 @media (max-width: 900px){
     #dashboard-page .cs-dash-stats{ grid-template-columns:1fr 1fr; }
     #dashboard-page .cs-dash-grid{ grid-template-columns:1fr; }
-    #dashboard-page .cs-dash-toolbar{ grid-template-columns:minmax(148px, 1fr) minmax(148px, 1fr); }
-    #dashboard-page #applyFilterBtn{ grid-column:1 / -1; }
+    #dashboard-page .cs-dash-toolbar{ grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); }
+    #dashboard-page #applyFilterBtn{ grid-column:1 / -1; width:100% !important; }
 }
 @media (max-width: 560px){
     #dashboard-page .cs-dash-stats{ grid-template-columns:1fr; }
@@ -494,15 +502,18 @@
    ======================================= */
 #sales-report-page .sr-toolbar{
     display:grid;
-    grid-template-columns: minmax(140px,1fr) minmax(140px,1fr) minmax(130px,.8fr) minmax(180px,1.4fr) auto auto;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1.4fr) auto auto;
     gap:10px; align-items:end; margin-bottom:16px;
+    min-width:0; max-width:100%;
 }
 #sales-report-page .sr-toolbar label{
     display:flex; flex-direction:column; gap:6px;
     font-size:12px; font-weight:700; color:#4BAA8B;
+    min-width:0; max-width:100%;
 }
 #sales-report-page .sr-toolbar input,
 #sales-report-page .sr-toolbar select{
+    display:block; width:100%; min-width:0; max-width:100%; box-sizing:border-box;
     height:40px; padding:0 10px; border:1px solid #FFE3B3; border-radius:8px; background:#fff;
 }
 #sales-report-page .sr-toolbar button{
@@ -576,9 +587,11 @@
     #dashboard-page .cs-dash-header,
     #dashboard-page .cs-dash-clock{ width:100%; min-width:0; }
     #dashboard-page .cs-dash-toolbar,
-    #dashboard-page .cs-dash-stats{ grid-template-columns:1fr; }
-    #dashboard-page .cs-dash-toolbar input[type="date"]{ min-width:0; width:100% !important; }
-    #dashboard-page #applyFilterBtn{ width:100% !important; }
+    #dashboard-page .cs-dash-stats{ grid-template-columns:minmax(0, 1fr); }
+    #dashboard-page .cs-dash-toolbar input[type="date"],
+    #dashboard-page #applyFilterBtn{
+        width:100% !important; min-width:0 !important; max-width:100%; box-sizing:border-box;
+    }
 
     #pos-page .pos-mode-selector{ display:grid; grid-template-columns:1fr; }
     #pos-page .pos-mode-btn{ width:100% !important; justify-content:center; white-space:normal; }
@@ -589,10 +602,12 @@
     #pos-page .filter-row select,
     #pos-page #scanBarcodeBtn{ width:100% !important; min-width:0; }
 
-    #sales-report-page .sr-toolbar{ grid-template-columns:1fr; }
+    #sales-report-page .sr-toolbar{ grid-template-columns:minmax(0, 1fr); }
     #sales-report-page .sr-toolbar input,
     #sales-report-page .sr-toolbar select,
-    #sales-report-page .sr-toolbar button{ width:100% !important; min-width:0; }
+    #sales-report-page .sr-toolbar button{
+        width:100% !important; min-width:0 !important; max-width:100%; box-sizing:border-box;
+    }
 
     #customer-segmentation-page .cs-seg-stats,
     #customer-segmentation-page .cs-seg-split,
@@ -603,9 +618,8 @@
 
     .content{ overflow-x:hidden; }
     .page{ min-width:0; max-width:100%; }
-    #dashboard-page .cs-chart-wrap,
+    #dashboard-page .cs-chart-wrap{ height:260px; max-width:100%; }
     #customer-segmentation-page .cs-seg-chart{ height:220px; max-width:100%; }
-    #dashboard-page canvas,
     #customer-segmentation-page canvas{ max-width:100% !important; }
 
     #pos-page #posTableWrapper{ overflow:visible; max-height:none; }
