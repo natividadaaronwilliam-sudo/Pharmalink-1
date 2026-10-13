@@ -3,8 +3,9 @@ import os
 import subprocess
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -43,15 +44,38 @@ def _fmt_money(value) -> str:
     return f"{float(value or 0):.2f}"
 
 
-def _fmt_dt(value, fmt: str) -> str:
+_MANILA = ZoneInfo("Asia/Manila")
+
+
+def _dt_manila(value):
     if value is None:
-        return ""
+        return None
     if isinstance(value, str):
         try:
             value = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
-            return value
-    return value.strftime(fmt)
+            return None
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(_MANILA)
+
+
+def _fmt_dt(value, fmt: str) -> str:
+    dt = _dt_manila(value)
+    if dt is not None:
+        return dt.strftime(fmt)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _iso_dt(value) -> str:
+    dt = _dt_manila(value)
+    if dt is None:
+        return ""
+    return dt.isoformat()
 
 
 @router.get("/home-stats")
@@ -1168,26 +1192,29 @@ def notifications(request: Request):
         return {"count": 0, "notifications": []}
     rows = fetch_all(
         """
-        SELECT order_id, order_status, order_date, payment_method
+        SELECT order_id, order_status, order_date, updated_at, payment_method
         FROM customer_orders
         WHERE customer_id = %s
           AND order_status IN ('Processing', 'Ready for Pickup', 'Completed', 'Cancelled')
           AND is_read = 0
-        ORDER BY order_date DESC
+        ORDER BY COALESCE(updated_at, order_date) DESC
         """,
         (customer_id,),
     )
     from app.routers.cashier import customer_status_note
 
-    notes = [
-        {
-            "order_id": r["order_id"],
-            "message": f"Order #{r['order_id']}: {customer_status_note(r['order_status'], r.get('payment_method') or '')}",
-            "status": r["order_status"],
-            "date": _fmt_dt(r["order_date"], "%b %d, %Y %I:%M %p"),
-        }
-        for r in rows
-    ]
+    notes = []
+    for r in rows:
+        when = r.get("updated_at") or r.get("order_date")
+        notes.append(
+            {
+                "order_id": r["order_id"],
+                "message": f"Order #{r['order_id']}: {customer_status_note(r['order_status'], r.get('payment_method') or '')}",
+                "status": r["order_status"],
+                "date": _fmt_dt(when, "%b %d, %Y %I:%M %p"),
+                "date_iso": _iso_dt(when),
+            }
+        )
     return {"count": len(notes), "notifications": notes}
 
 

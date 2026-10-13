@@ -25,7 +25,7 @@
                     if (profile.success && profile.staff) staff = profile.staff;
                 } catch (err) {}
                 applyProfile(staff, me.firstName, me.lastName, me.profile_image || staff.profile_image);
-                startLiveClock();
+                // Live clock is owned by theme.js so Admin and Cashier stay in sync.
             }
         } catch (err) {
             return;
@@ -87,19 +87,6 @@
         document.querySelectorAll('#profile-page .p-input').forEach((input) => {
             window.profileOriginal[input.id] = input.value;
         });
-    }
-
-    function startLiveClock() {
-        const el = document.getElementById('live-clock');
-        if (!el) return;
-        const tick = () => {
-            el.textContent = new Date().toLocaleString('en-PH', {
-                weekday: 'long', year: 'numeric', month: 'short', day: 'numeric',
-                hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true
-            });
-        };
-        tick();
-        setInterval(tick, 1000);
     }
 
     function fillSegmentationKpis(charts) {

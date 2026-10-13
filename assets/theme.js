@@ -407,6 +407,33 @@
     msgObserver.observe(document.body, { childList: true });
   });
 
+  var PH_TZ = 'Asia/Manila';
+
+  function phManilaClockText() {
+    return new Date().toLocaleString('en-PH', {
+      timeZone: PH_TZ,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var el = document.getElementById('live-clock');
+    if (!el || el.getAttribute('data-ph-clock') === '1') return;
+    el.setAttribute('data-ph-clock', '1');
+    function tickClock() {
+      el.textContent = phManilaClockText();
+    }
+    tickClock();
+    setInterval(tickClock, 1000);
+  });
+
   /* ---- 4. Staff (Admin/Cashier) notification bell ----
      Purely additive: only runs if #staffNotificationBell exists on the
      page (Admin & Cashier portals). Polls get_notifications_staff.php
@@ -533,6 +560,7 @@
     }
 
     var lastUnreadCount = 0;
+    var seenNotifKeys = null;
 
     function applyBadge(count) {
       lastUnreadCount = Math.max(0, Number(count) || 0);
@@ -588,25 +616,37 @@
       var d = new Date(iso);
       if (isNaN(d.getTime())) return fallback || '';
       var sec = Math.round((Date.now() - d.getTime()) / 1000);
-      var clock = d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
-      if (sec < 45) return 'Just now';
+      var clockOpts = { timeZone: PH_TZ, hour: 'numeric', minute: '2-digit', hour12: true };
+      var clock = d.toLocaleTimeString('en-PH', clockOpts);
+      if (sec < 45) return 'Just now · ' + clock;
       if (sec < 3600) {
         var mins = Math.max(1, Math.floor(sec / 60));
-        return mins === 1 ? '1 minute ago' : mins + ' minutes ago';
+        var ago = mins === 1 ? '1 minute ago' : mins + ' minutes ago';
+        return ago + ' · ' + clock;
       }
-      var startToday = new Date();
+      var manilaNow = new Date(new Date().toLocaleString('en-US', { timeZone: PH_TZ }));
+      var manilaThen = new Date(d.toLocaleString('en-US', { timeZone: PH_TZ }));
+      var startToday = new Date(manilaNow);
       startToday.setHours(0, 0, 0, 0);
-      if (d >= startToday) return 'Today, ' + clock;
+      if (manilaThen >= startToday) return 'Today, ' + clock;
       var startY = new Date(startToday);
       startY.setDate(startY.getDate() - 1);
-      if (d >= startY) return 'Yesterday, ' + clock;
+      if (manilaThen >= startY) return 'Yesterday, ' + clock;
       return d.toLocaleString('en-PH', {
+        timeZone: PH_TZ,
         month: 'short',
         day: 'numeric',
         year: 'numeric',
         hour: 'numeric',
-        minute: '2-digit'
+        minute: '2-digit',
+        hour12: true
       });
+    }
+
+    function isFreshNotif(n) {
+      var t = Date.parse((n && n.date_iso) || '') || 0;
+      if (!t) return false;
+      return (Date.now() - t) < 5 * 60 * 1000;
     }
 
     function render(notifications) {
@@ -616,25 +656,41 @@
         var tb = Date.parse((b && b.date_iso) || '') || 0;
         return tb - ta;
       });
+      var keysNow = {};
+      var arrived = {};
       notifications.forEach(function (n) {
-        if (n && n.notif_key) notesByKey[n.notif_key] = n;
+        if (!n || !n.notif_key) return;
+        notesByKey[n.notif_key] = n;
+        keysNow[n.notif_key] = true;
+        if (seenNotifKeys === null) {
+          if (isFreshNotif(n)) arrived[n.notif_key] = true;
+        } else if (!seenNotifKeys[n.notif_key]) {
+          arrived[n.notif_key] = true;
+        } else if (isFreshNotif(n)) {
+          arrived[n.notif_key] = true;
+        }
       });
+      seenNotifKeys = keysNow;
+      var hasNew = Object.keys(arrived).length > 0;
+      bell.classList.toggle('has-new', hasNew);
       if (!notifications || notifications.length === 0) {
         dropdown.innerHTML = '<div class="staff-notif-empty">No new alerts. You are all caught up!</div>';
         return;
       }
       dropdown.innerHTML = notifications.map(function (n) {
         var when = formatNotifWhen(n.date_iso, n.date);
+        var isNew = !!arrived[n.notif_key];
         var dateLine = when
           ? '<br><small class="staff-notif-when" style="color:#9ca3af;" data-iso="' + escHtml(n.date_iso || '') + '">' + escHtml(when) + '</small>'
           : '';
-        return '<div class="staff-notif-item ' + escHtml(n.type) + '"' +
+        var newMark = isNew ? '<span class="staff-notif-new">NEW</span>' : '';
+        return '<div class="staff-notif-item ' + escHtml(n.type) + (isNew ? ' is-new' : '') + '"' +
                ' data-notif-key="' + escHtml(n.notif_key) + '"' +
                ' data-target="' + escHtml(n.target || 'inventory') + '"' +
                ' data-inv-filter="' + escHtml(n.inv_filter || '') + '"' +
                ' role="button" tabindex="0">' +
                '<i class="fas ' + iconFor(n.type) + '"></i>' +
-               '<span>' + escHtml(n.message) + dateLine + '</span></div>';
+               '<span>' + escHtml(n.message) + newMark + dateLine + '</span></div>';
       }).join('');
       dropdown.scrollTop = 0;
 
@@ -695,8 +751,8 @@
     });
 
     refresh();
-    setInterval(refresh, 8000);
-    setInterval(tickNotifTimes, 15000);
+    setInterval(refresh, 4000);
+    setInterval(tickNotifTimes, 1000);
   });
 
   /* ---- 5. Logout Yes / No confirm (Admin, Cashier, Customer) ---- */

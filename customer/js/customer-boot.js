@@ -40,7 +40,7 @@
         }
 
         const script = document.createElement('script');
-        script.src = '/customer/js/customer.js?v=shop-copy1';
+        script.src = '/customer/js/customer.js?v=notif-new1';
         document.body.appendChild(script);
     });
 
