@@ -1158,7 +1158,7 @@ window.clearCart = function() {
  */
 function printReceipt(responseData, saleData, printWindow) {
     const transactionId = responseData.transaction_id || 'N/A';
-    const date = new Date().toLocaleString();
+    const date = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
     
     // ⭐ FIX #1: GUMAMIT NG TAMANG LOGIC PARA SA CUSTOMER DISPLAY ⭐
     let customerDisplay;
@@ -2221,7 +2221,7 @@ console.log("Dashboard Inputs Found. Setting defaults...");
         const endDateObj = new Date();
         const startDateObj = new Date();
         startDateObj.setDate(endDateObj.getDate() - 6);
-        const fmt = (d) => d.toISOString().split('T')[0];
+        const fmt = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
         startDateInput.value = fmt(startDateObj);
         endDateInput.value = fmt(endDateObj);
         
@@ -2242,7 +2242,7 @@ console.log("Dashboard Inputs Found. Setting defaults...");
         const endObj = new Date();
         const startObj = new Date();
         startObj.setDate(endObj.getDate() - 6);
-        const fmt = (d) => d.toISOString().split('T')[0];
+        const fmt = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
         srStart.value = fmt(startObj);
         srEnd.value = fmt(endObj);
     }
@@ -3155,10 +3155,11 @@ function updateDashboardStats(start, end) {
  */
 function recentTxRow(t) {
     const statusClass = String(t.status || '').toLowerCase().replace(/\s+/g, '-');
-    const transactionDate = new Date(t.date_created).toLocaleDateString('en-US', {
+    const transactionDate = t.date_display || new Date(t.date_created).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
-        year: 'numeric'
+        year: 'numeric',
+        timeZone: 'Asia/Manila'
     });
     return `<tr>
         <td>${dashEsc(transactionDate)}</td>
