@@ -34,18 +34,19 @@ def _fmt_staff_dt(val) -> str:
     return str(val)
 
 
-def _staff_nav(atype: str) -> tuple[str, str]:
+def _staff_nav(atype: str, title: str = "") -> tuple[str, str]:
     t = (atype or "").lower()
+    label = (title or "").lower()
     if t == "auto_po":
         return "deliveries", ""
     if t in {"online_order", "order_paid"}:
         return "orders", ""
     if t == "expired":
         return "inventory", "all"
-    if t in {"expiring", "expiring_30"}:
+    if t in {"expiring", "expiring_30", "expiring_90"}:
+        if t == "expiring_90" or "90" in label:
+            return "inventory", "expiring"
         return "inventory", "expiring30"
-    if t == "expiring_90":
-        return "inventory", "expiring"
     if t in {"low", "low_stock", "out", "out_of_stock"}:
         return "inventory", "low"
     return "dashboard", ""
@@ -85,7 +86,7 @@ _NOTE_TITLES = {
 
 
 def _pack_note(notif_key: str, atype: str, message: str, date: str = "", title: str = "") -> dict:
-    target, inv_filter = _staff_nav(atype)
+    target, inv_filter = _staff_nav(atype, title)
     kind = atype or "alert"
     raw = (title or "").strip()
     friendly = _NOTE_TITLES.get(kind, "Alert")
@@ -218,7 +219,7 @@ def _unread_staff_notes(user_id: int) -> tuple[int, list[dict]]:
             _pack_note(
                 key,
                 "expiring",
-                f"Expiring soon: {row['generic_name']} ({row['brand_name']}), lot {row['lot_number']} - {row['days_left']} day(s) left.",
+                f"Expiring soon: {row['generic_name']} ({row['brand_name']}), {row['lot_number']} - {row['days_left']} day(s) left.",
             )
         )
     return len(notes), notes

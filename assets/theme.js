@@ -503,8 +503,13 @@
       if (type === 'low_stock' || type === 'low') return 'Low stock';
       if (type === 'out_of_stock' || type === 'out') return 'Out of stock';
       if (type === 'expired') return 'Expired lot';
-      if (type === 'expiring_30' || type === 'expiring') return 'Near expiry (30 days)';
+      if (type === 'expiring_30') return 'Near expiry (30 days)';
       if (type === 'expiring_90') return 'Near expiry (90 days)';
+      if (type === 'expiring') {
+        if ((raw || '').indexOf('90') !== -1) return 'Near expiry (90 days)';
+        if ((raw || '').indexOf('30') !== -1) return 'Near expiry (30 days)';
+        return raw || 'Near expiry';
+      }
       if (type === 'auto_po') return 'Automatic purchase order';
       if (type === 'online_order') return 'New online order';
       if (type === 'order_paid') return 'Payment received';
