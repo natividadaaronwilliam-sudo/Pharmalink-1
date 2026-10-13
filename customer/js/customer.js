@@ -1164,30 +1164,105 @@ function updateNotificationBadge(count) {
             badge.className = 'notification-badge';
             notificationBell.appendChild(badge);
         }
-        badge.textContent = notificationCount > 9 ? '9+' : notificationCount;
+        badge.textContent = notificationCount > 99 ? '99+' : notificationCount;
     } else if (badge) {
         badge.remove();
     }
 }
 
-function renderNotificationDropdown(notifications) {
-    if (!notificationDropdown || !notificationDropdown.classList.contains('open')) return;
+const PH_TZ = 'Asia/Manila';
+let seenCustomerNotifKeys = null;
 
-    if (!notifications || notifications.length === 0) {
+function escapeNotifHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+}
+
+function formatCustomerNotifWhen(iso, fallback) {
+    if (!iso) return fallback || '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return fallback || '';
+    const sec = Math.round((Date.now() - d.getTime()) / 1000);
+    const clock = d.toLocaleTimeString('en-PH', { timeZone: PH_TZ, hour: 'numeric', minute: '2-digit', hour12: true });
+    if (sec < 45) return 'Just now · ' + clock;
+    if (sec < 3600) {
+        const mins = Math.max(1, Math.floor(sec / 60));
+        return (mins === 1 ? '1 minute ago' : mins + ' minutes ago') + ' · ' + clock;
+    }
+    const manilaNow = new Date(new Date().toLocaleString('en-US', { timeZone: PH_TZ }));
+    const manilaThen = new Date(d.toLocaleString('en-US', { timeZone: PH_TZ }));
+    const startToday = new Date(manilaNow);
+    startToday.setHours(0, 0, 0, 0);
+    if (manilaThen >= startToday) return 'Today, ' + clock;
+    const startY = new Date(startToday);
+    startY.setDate(startY.getDate() - 1);
+    if (manilaThen >= startY) return 'Yesterday, ' + clock;
+    return d.toLocaleString('en-PH', {
+        timeZone: PH_TZ,
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+}
+
+function isFreshCustomerNotif(n) {
+    const t = Date.parse((n && n.date_iso) || '') || 0;
+    if (!t) return false;
+    return (Date.now() - t) < 5 * 60 * 1000;
+}
+
+function renderNotificationDropdown(notifications) {
+    if (!notificationDropdown) return;
+
+    notifications = (notifications || []).slice().sort((a, b) => {
+        const ta = Date.parse((a && a.date_iso) || '') || 0;
+        const tb = Date.parse((b && b.date_iso) || '') || 0;
+        return tb - ta;
+    });
+    const keysNow = {};
+    const arrived = {};
+    notifications.forEach((n) => {
+        const key = String((n && n.order_id) || '');
+        if (!key) return;
+        keysNow[key] = true;
+        if (seenCustomerNotifKeys === null) {
+            if (isFreshCustomerNotif(n)) arrived[key] = true;
+        } else if (!seenCustomerNotifKeys[key] || isFreshCustomerNotif(n)) {
+            arrived[key] = true;
+        }
+    });
+    seenCustomerNotifKeys = keysNow;
+    const hasNew = Object.keys(arrived).length > 0;
+    if (notificationBell) notificationBell.classList.toggle('has-new', hasNew);
+
+    if (!notificationDropdown.classList.contains('open')) return;
+
+    if (!notifications.length) {
         notificationDropdown.innerHTML = '<div class="staff-notif-empty">No new alerts. You are all caught up!</div>';
         return;
     }
 
-    notificationDropdown.innerHTML = notifications.map(notif => `
-        <div class="staff-notif-item order_update"
-             data-order-id="${notif.order_id}"
+    notificationDropdown.innerHTML = notifications.map((notif) => {
+        const key = String(notif.order_id || '');
+        const isNew = !!arrived[key];
+        const when = formatCustomerNotifWhen(notif.date_iso, notif.date);
+        const dateLine = when
+            ? `<br><small class="staff-notif-when" style="color:#9ca3af;" data-iso="${escapeNotifHtml(notif.date_iso || '')}">${escapeNotifHtml(when)}</small>`
+            : '';
+        const newMark = isNew ? '<span class="staff-notif-new">NEW</span>' : '';
+        return `<div class="staff-notif-item order_update${isNew ? ' is-new' : ''}"
+             data-order-id="${escapeNotifHtml(key)}"
              role="button"
-             tabindex="0"
-             style="cursor:pointer;">
+             tabindex="0">
             <i class="fas fa-receipt"></i>
-            <span>${notif.message}<br><small style="color:#9ca3af;">${notif.date}</small></span>
-        </div>
-    `).join('');
+            <span>${escapeNotifHtml(notif.message)}${newMark}${dateLine}</span>
+        </div>`;
+    }).join('');
+    notificationDropdown.scrollTop = 0;
 
     notificationDropdown.querySelectorAll('.staff-notif-item[data-order-id]').forEach(item => {
         item.addEventListener('click', (e) => {
@@ -1204,6 +1279,15 @@ function renderNotificationDropdown(notifications) {
                 item.click();
             }
         });
+    });
+}
+
+function tickCustomerNotifTimes() {
+    if (!notificationDropdown) return;
+    notificationDropdown.querySelectorAll('.staff-notif-when[data-iso]').forEach((el) => {
+        const iso = el.getAttribute('data-iso') || '';
+        if (!iso) return;
+        el.textContent = formatCustomerNotifWhen(iso, el.textContent);
     });
 }
 
@@ -1257,23 +1341,8 @@ if (notificationBell && notificationDropdown) {
         }
     });
 
-    setInterval(checkNotifications, 30000);
+    setInterval(checkNotifications, 4000);
+    setInterval(tickCustomerNotifTimes, 1000);
     checkNotifications();
-}
-
-// =======================================================
-// LIVE CLOCK ("Server Date & Time" widget, same as Admin/Cashier)
-// =======================================================
-const liveClockEl = document.getElementById('live-clock');
-if (liveClockEl) {
-    const tickClock = () => {
-        const now = new Date();
-        liveClockEl.textContent = now.toLocaleString('en-PH', {
-            weekday: 'short', month: 'short', day: 'numeric',
-            hour: 'numeric', minute: '2-digit', hour12: true
-        });
-    };
-    tickClock();
-    setInterval(tickClock, 30000);
 }
 });
