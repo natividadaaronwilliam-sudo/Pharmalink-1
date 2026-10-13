@@ -24,6 +24,7 @@ LEAD_DAYS = 7
 TARGET_DAYS = 30
 OVERSTOCK_DAYS = 90
 SALES_WINDOW_DAYS = 30
+MAX_STOCK = 500
 
 _scheduler = None
 _last_run: dict = {}
@@ -218,25 +219,43 @@ def _log_system(cur, action: str, details: str) -> None:
     )
 
 
+def _lot_phrase(lot_number) -> str:
+    raw = str(lot_number or "").strip() or "unknown"
+    if raw.upper().startswith("LOT"):
+        return raw
+    return f"lot {raw}"
+
+
 def _upsert_alert(cur, alert_type: str, ref_key: str, severity: str, title: str, message: str) -> bool:
     cur.execute(
-        "SELECT alert_id, message FROM system_alerts WHERE alert_type = %s AND ref_key = %s",
+        "SELECT alert_id, message, severity, title FROM system_alerts WHERE alert_type = %s AND ref_key = %s",
         (alert_type, ref_key),
     )
     existing = cur.fetchone()
     if existing:
-        if existing.get("message") == message:
+        if (
+            existing.get("message") == message
+            and existing.get("severity") == severity
+            and existing.get("title") == title
+        ):
             return False
+        became_worse = existing.get("severity") != severity or existing.get("title") != title
+        if became_worse:
+            cur.execute(
+                """
+                UPDATE system_alerts
+                SET severity = %s, title = %s, message = %s, created_at = NOW(), email_sent_at = NULL
+                WHERE alert_id = %s
+                """,
+                (severity, title, message, existing["alert_id"]),
+            )
+            _push_staff_alert(alert_type, title, message)
+            return True
         cur.execute(
-            """
-            UPDATE system_alerts
-            SET severity = %s, title = %s, message = %s, created_at = NOW(), email_sent_at = NULL
-            WHERE alert_id = %s
-            """,
-            (severity, title, message, existing["alert_id"]),
+            "UPDATE system_alerts SET message = %s WHERE alert_id = %s",
+            (message, existing["alert_id"]),
         )
-        _push_staff_alert(alert_type, title, message)
-        return True
+        return False
     alert_id = next_id(cur, "system_alerts", "alert_id")
     cur.execute(
         """
@@ -320,6 +339,7 @@ def deactivate_expired_lots(cur) -> int:
 
 def scan_near_expiry(cur) -> int:
     created = 0
+    active_refs = []
     cur.execute(
         """
         SELECT l.lot_inventory_id, l.lot_number, l.expiration_date, l.current_stock,
@@ -337,17 +357,89 @@ def scan_near_expiry(cur) -> int:
     for row in cur.fetchall():
         days = int(row["days_left"] or 0)
         lot_id = int(row["lot_inventory_id"])
-        if days <= 30:
-            alert_type, severity, window = "expiring_30", "warning", "30"
-        else:
-            alert_type, severity, window = "expiring_90", "info", "90"
+        qty = int(row["current_stock"] or 0)
+        window = "30" if days <= 30 else "90"
+        severity = "warning" if days <= 30 else "info"
         title = f"Near expiry ({window} days)"
+        day_word = "day" if days == 1 else "days"
+        piece_word = "piece" if qty == 1 else "pieces"
         message = (
-            f"{row['generic_name']} ({row['brand_name']}), lot {row['lot_number']} - "
-            f"{days} day(s) left, {int(row['current_stock'] or 0)} unit(s) on hand."
+            f"{row['generic_name']} ({row['brand_name']}), {_lot_phrase(row['lot_number'])} - "
+            f"{days} {day_word} left, {qty} {piece_word} on hand."
         )
-        if _upsert_alert(cur, alert_type, f"lot:{lot_id}:{window}", severity, title, message):
+        ref = f"lot:{lot_id}"
+        active_refs.append(ref)
+        cur.execute(
+            """
+            SELECT alert_id, alert_type, ref_key, message, severity, title
+            FROM system_alerts
+            WHERE (alert_type = 'expiring' AND ref_key = %s)
+               OR (
+                    alert_type IN ('expiring', 'expiring_30', 'expiring_90')
+                    AND ref_key IN (%s, %s, %s)
+               )
+            ORDER BY alert_id
+            """,
+            (ref, ref, f"lot:{lot_id}:30", f"lot:{lot_id}:90"),
+        )
+        siblings = cur.fetchall() or []
+        keep = next(
+            (row for row in siblings if row["alert_type"] == "expiring" and row["ref_key"] == ref),
+            siblings[0] if siblings else None,
+        )
+        extra_ids = [int(row["alert_id"]) for row in siblings if keep is None or int(row["alert_id"]) != int(keep["alert_id"])]
+        if extra_ids:
+            cur.execute("DELETE FROM system_alerts WHERE alert_id = ANY(%s)", (extra_ids,))
+        if keep:
+            already = (
+                keep.get("alert_type") == "expiring"
+                and keep.get("ref_key") == ref
+                and keep.get("message") == message
+                and keep.get("severity") == severity
+                and keep.get("title") == title
+            )
+            if already:
+                continue
+            window_changed = keep.get("title") != title or keep.get("severity") != severity
+            if window_changed:
+                cur.execute(
+                    """
+                    UPDATE system_alerts
+                    SET alert_type = 'expiring', ref_key = %s, severity = %s, title = %s,
+                        message = %s, created_at = NOW(), email_sent_at = NULL
+                    WHERE alert_id = %s
+                    """,
+                    (ref, severity, title, message, keep["alert_id"]),
+                )
+                _push_staff_alert("expiring", title, message)
+                created += 1
+            else:
+                cur.execute(
+                    """
+                    UPDATE system_alerts
+                    SET alert_type = 'expiring', ref_key = %s, message = %s
+                    WHERE alert_id = %s
+                    """,
+                    (ref, message, keep["alert_id"]),
+                )
+            continue
+        if _upsert_alert(cur, "expiring", ref, severity, title, message):
             created += 1
+    cur.execute("DELETE FROM system_alerts WHERE alert_type IN ('expiring_30', 'expiring_90')")
+    if active_refs:
+        cur.execute(
+            """
+            DELETE FROM system_alerts
+            WHERE alert_type = 'expiring'
+              AND ref_key LIKE 'lot:%%'
+              AND NOT (ref_key = ANY(%s))
+            """,
+            (active_refs,),
+        )
+    else:
+        cur.execute(
+            "DELETE FROM system_alerts WHERE alert_type = 'expiring' AND ref_key LIKE 'lot:%%'"
+        )
     return created
 
 
@@ -371,13 +463,20 @@ def scan_stock_alerts(cur) -> int:
             msg = f"Out of stock: {row['generic_name']} ({row['brand_name']}) - restock immediately."
             severity = "critical"
         else:
+            piece_word = "piece" if on_hand == 1 else "pieces"
             msg = (
-                f"Low stock: {row['generic_name']} ({row['brand_name']}) - {on_hand} left "
+                f"Low stock: {row['generic_name']} ({row['brand_name']}) - {on_hand} {piece_word} left "
                 f"(min {int(row['minimum_stock'] or 0)})."
             )
             severity = "warning"
         title = "Out of stock" if status == "out" else "Low stock"
-        if _upsert_alert(cur, status, f"drug:{row['drug_id']}", severity, title, msg):
+        ref = f"drug:{row['drug_id']}"
+        other = "out" if status == "low" else "low"
+        cur.execute(
+            "DELETE FROM system_alerts WHERE alert_type = %s AND ref_key = %s",
+            (other, ref),
+        )
+        if _upsert_alert(cur, status, ref, severity, title, msg):
             created += 1
     return created
 
@@ -561,55 +660,28 @@ def compute_reorder_suggestions() -> dict:
             source = "recent_average"
         has_demand = avg > 0
         days_of_stock = round(current / avg, 1) if has_demand else None
-        reorder_point = (avg * lead) + minimum
-        target_stock = (avg * target) + minimum
         procurement = str(row.get("procurement_type") or "purchase").lower()
         if procurement not in {"purchase", "consignment"}:
             procurement = "purchase"
-        stock_for_order = current
         auto_po = True
-        shown_rate = round(avg, 1) if avg >= 1 else round(avg, 2)
-        rate_text = f"~{shown_rate}/day"
-        forecast_n = int(round(predicted)) if predicted is not None else 0
-        unit_word = "unit" if forecast_n == 1 else "units"
-        if source == "prophet":
-            signal = f"Prophet forecast: {rate_text} for the next {target} days (about {forecast_n} {unit_word})"
-        elif sold > 0:
-            signal = f"Recent {window}-day average {rate_text} (Prophet needs at least 2 sale days for this medicine)"
-        else:
-            signal = ""
         action, qty, reduce_qty, reasoning = "ok", 0, 0, ""
-        below_minimum = minimum > 0 and stock_for_order <= minimum
-        if below_minimum or (has_demand and stock_for_order <= reorder_point):
-            action = "increase"
-            qty = max(1, int(math.ceil(target_stock - stock_for_order)))
-            counted = f" Unexpired stock is {current}."
-            reasoning = (
-                f"{signal}.{counted} Order {qty} to cover that forecast and still keep the minimum of {minimum}."
-                if has_demand
-                else f"Stock counted for reorder is at or below minimum ({minimum}); no forecasted demand - minimum-buffer refill."
-            )
-        elif has_demand and days_of_stock is not None and days_of_stock > overstock:
+        if current <= minimum:
+            qty = max(0, MAX_STOCK - current)
+            if qty > 0:
+                action = "increase"
+                reasoning = (
+                    f"Stock is {current}, at or below the minimum of {minimum}. "
+                    f"Order {qty} to bring it back to {MAX_STOCK}."
+                )
+            else:
+                reasoning = f"Stock is {current}, already at the maximum of {MAX_STOCK}."
+        elif current > MAX_STOCK:
             action = "decrease"
-            qty = 0
-            reduce_qty = max(0, current - max(minimum, int(math.ceil(target_stock))))
-            reasoning = (
-                f"{signal}. This covers ~{days_of_stock} days - pause reorders"
-                + (f" (about {reduce_qty} units above the {target}-day target)." if reduce_qty else ".")
-            )
-        elif not has_demand and current > minimum * 3 and minimum > 0:
-            action = "decrease"
-            qty = 0
-            reduce_qty = max(0, current - minimum)
-            reasoning = (
-                f"No sales in {window} days, and stock ({current}) is well above minimum ({minimum})"
-                + (f" - {reduce_qty} units can wait." if reduce_qty else ".")
-            )
+            reduce_qty = current - MAX_STOCK
+            reasoning = f"Stock is {current}, above the maximum of {MAX_STOCK} by {reduce_qty} pieces."
         else:
             reasoning = (
-                f"{signal}. {days_of_stock} days of stock - sufficient."
-                if has_demand
-                else "No recent sales, and stock is within a reasonable range of the minimum."
+                f"Stock is {current}, between the minimum of {minimum} and the maximum of {MAX_STOCK}."
             )
         suggestions.append({
             "drug_id": int(row["drug_id"]),
@@ -649,6 +721,8 @@ def compute_reorder_suggestions() -> dict:
             "sales_window_days": window,
             "demand_model": demand_engine,
             "unexpired_stock_only": True,
+            "reorder_when": "at_or_below_minimum",
+            "order_up_to": MAX_STOCK,
         },
         "suggestions": suggestions,
     }
@@ -750,7 +824,7 @@ def create_auto_purchase_orders() -> dict:
         and s.get("auto_po", True)
     ]
     notes = (
-        "This is an automatic order. PharmaLink prepared it from the stock we expect to need in the next 30 days."
+        "This is an automatic order. Stock reached the minimum, so PharmaLink ordered enough to bring it back up to 500."
     )
     result = create_purchase_orders_from_needs(needs, "System", notes, raise_alerts=True)
     from app.routers.admin_ops import send_saved_purchase_order

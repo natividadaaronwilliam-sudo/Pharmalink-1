@@ -181,8 +181,8 @@ def validate_drug_fields(
         min_stock = int(minimum_stock)
     except (TypeError, ValueError):
         return "Minimum stock must be a whole number."
-    if min_stock < 0 or min_stock > 100000:
-        return "Minimum stock must be between 0 and 100,000."
+    if min_stock < 1 or min_stock > 500:
+        return "Minimum stock must be between 1 and 500."
     if barcode and not BARCODE_RE.match(barcode):
         return "Barcode must be 4-64 characters (letters, numbers, dash, dot, underscore)."
     return None

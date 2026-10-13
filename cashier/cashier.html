@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PharmaLink System - Cashier/Pharmacist Dashboard</title>
     <link rel="stylesheet" href="/assets/theme.css?v=date-fit1">
-    <link rel="stylesheet" href="/cashier/css/cashier.css?v=date-fit1">
+    <link rel="stylesheet" href="/cashier/css/cashier.css?v=pos-modal1">
     <link rel="stylesheet" href="/shared/css/segmentation.css?v=palette-w4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -272,15 +272,6 @@
     </label>
 </div>
 
-            <div id="customerModal" class="modal">
-                <div class="pos-modal-card">
-                    <h4>Select Customer (Optional)</h4>
-                    <input type="text" id="customerSearch" placeholder="Search name, username, or number..." autocomplete="off">
-                    <ul id="customerList"></ul>
-                    <button type="button" id="closeModal"><i class="fas fa-xmark"></i> Close</button>
-                </div>
-            </div>
-
             <table class="pos-cart-table">
                 <thead></thead>
                 <tbody id="cartTable"></tbody>
@@ -329,6 +320,15 @@
             </div>
         </div>
         </div>
+
+<div id="customerModal" class="modal" aria-hidden="true">
+    <div class="pos-modal-card" role="dialog" aria-labelledby="customerModalTitle">
+        <h4 id="customerModalTitle">Select Customer (Optional)</h4>
+        <input type="text" id="customerSearch" placeholder="Search name, username, or number..." autocomplete="off">
+        <ul id="customerList"></ul>
+        <button type="button" id="closeModal"><i class="fas fa-xmark"></i> Close</button>
+    </div>
+</div>
 
 <div id="ewalletQrModal" class="modal">
     <div class="pos-scan-card">
@@ -2898,23 +2898,47 @@ navItems.forEach(item => {
 
   let customers = [];
 
-  // Fetch customers from database
-  fetch("/api/cashier/customers")
-    .then(res => res.json())
-    .then(data => { customers = data; renderCustomerList(customers); })
-    .catch(err => console.error("Error loading customers:", err));
+  function asCustomerList(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.customers)) return data.customers;
+    return [];
+  }
 
-  // Open modal
-  selectBtn.addEventListener("click", () => {
+  function loadCustomers() {
+    return fetch("/api/cashier/customers", { credentials: "same-origin" })
+      .then((res) => res.json())
+      .then((data) => {
+        customers = asCustomerList(data);
+        filterCustomerList();
+        return customers;
+      })
+      .catch((err) => {
+        console.error("Error loading customers:", err);
+        customers = [];
+        customerList.innerHTML = "<li style='padding:8px;'>Could not load customers. Try again.</li>";
+        return customers;
+      });
+  }
+
+  loadCustomers();
+
+  function openCustomerModal() {
     modal.style.display = "flex";
+    modal.setAttribute("aria-hidden", "false");
     searchInput.value = "";
-    renderCustomerList(customers);
-    searchInput.focus();
-  });
+    customerList.innerHTML = "<li style='padding:8px;'>Loading customers...</li>";
+    loadCustomers().then(() => searchInput.focus());
+  }
 
-  // Close modal
-  closeModal.addEventListener("click", () => {
+  function closeCustomerModal() {
     modal.style.display = "none";
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  selectBtn.addEventListener("click", openCustomerModal);
+  closeModal.addEventListener("click", closeCustomerModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeCustomerModal();
   });
 
   function customerMatches(c, query) {
@@ -2940,13 +2964,14 @@ navItems.forEach(item => {
 
   // Render list
   function renderCustomerList(list) {
+    const rows = Array.isArray(list) ? list : [];
     customerList.innerHTML = "";
-    if (list.length === 0) {
-      customerList.innerHTML = "<li style='padding:5px;'>No customer found</li>";
+    if (rows.length === 0) {
+      customerList.innerHTML = "<li style='padding:8px;'>No customer found</li>";
       return;
     }
 
-    list.forEach(c => {
+    rows.forEach(c => {
       const li = document.createElement("li");
       li.dataset.customerId = c.customer_id;
       li.textContent = c.name;
@@ -2963,7 +2988,7 @@ navItems.forEach(item => {
         };
         refreshCustomerSegment();
         selectedCustomerSpan.textContent = selectedCustomerSegment ? `${c.name} · ${selectedCustomerSegment}` : c.name;
-        modal.style.display = "none";
+        closeCustomerModal();
         const availablePointsSpan = document.getElementById('availablePointsDisplay');
         if (availablePointsSpan) availablePointsSpan.textContent = selectedCustomer.loyalty_points.toFixed(2);
         updateCart();
@@ -3678,7 +3703,7 @@ document.getElementById('searchInput').addEventListener('input', function() {
 
 
 
-<script src="/assets/theme.js?v=push3"></script>
+<script src="/assets/theme.js?v=push4"></script>
 </body>
 
 </html>

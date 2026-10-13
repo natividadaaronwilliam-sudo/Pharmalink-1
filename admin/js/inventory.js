@@ -427,7 +427,7 @@
         if (!payload.form) return 'Form is required.';
         if (!payload.category) return 'Category is required.';
         const min = Number(payload.minimum_stock);
-        if (!Number.isInteger(min) || min < 0 || min > 100000) return 'Minimum stock must be a whole number from 0 to 100,000.';
+        if (!Number.isInteger(min) || min < 1 || min > 500) return 'Minimum stock must be a whole number from 1 to 500.';
         if (payload.barcode && !/^[A-Za-z0-9\-._]{4,64}$/.test(payload.barcode)) return 'Barcode must be 4-64 letters, numbers, dash, dot, or underscore.';
         if (!payload.procurement_type || !['purchase', 'consignment'].includes(payload.procurement_type)) {
             return 'Choose Purchased or Consignment. It is not set automatically.';

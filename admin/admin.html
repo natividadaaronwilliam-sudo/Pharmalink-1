@@ -604,7 +604,7 @@
                         <div class="um-card-head">
                             <div>
                                 <h3>Reorder Suggestions</h3>
-                                <p>Prophet forecast for the next 30 days. Select items, then create a purchase order.</p>
+                                <p>When stock hits the minimum, order enough to bring it back to 500. Select items, then create a purchase order.</p>
                             </div>
                             <button type="button" id="createDraftPoBtn" class="action-btn" disabled>
                                 <i class="fas fa-file-invoice"></i> Create PO (<span id="draftPoSelectedCount">0</span>)
@@ -2613,9 +2613,7 @@
             let note;
             if (r.action === 'increase') {
                 actionBadge = `<span class="reorder-action-badge is-up">Order ${r.suggested_qty}</span>`;
-                note = r.forecast_units != null
-                    ? `Forecast ${r.forecast_units} in 30 days.`
-                    : 'Based on recent sales.';
+                note = `Hit the minimum of ${r.minimum_stock}. Order up to 500.`;
             } else if (r.action === 'decrease') {
                 actionBadge = `<span class="reorder-action-badge is-down">Pause</span>`;
                 note = r.days_of_stock != null ? `${r.days_of_stock} days of stock.` : 'More than enough stock.';
@@ -3829,7 +3827,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </select>
                 <input type="text" id="new_category_custom" placeholder="New category name" maxlength="60" style="display:none;margin-top:6px;">
                 <label for="new_minimum_stock">Minimum Stock Level:</label>
-                <input type="number" id="new_minimum_stock" min="0" max="100000" step="1" value="20" required>
+                <input type="number" id="new_minimum_stock" min="1" max="500" step="1" value="20" required>
                 <label for="new_sale_class">Type:</label>
                 <select id="new_sale_class" required>
                     <option value="otc">OTC</option>
@@ -3877,7 +3875,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </select>
                 <input type="text" id="edit_category_custom" placeholder="New category name" maxlength="60" style="display:none;margin-top:6px;">
                 <label for="edit_minimum_stock">Minimum Stock Level:</label>
-                <input type="number" id="edit_minimum_stock" min="0" max="100000" step="1" required>
+                <input type="number" id="edit_minimum_stock" min="1" max="500" step="1" required>
                 <label for="edit_sale_class">Type:</label>
                 <select id="edit_sale_class" required>
                     <option value="otc">OTC</option>
@@ -4062,7 +4060,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
-    <script src="/admin/js/inventory.js?v=no-policy1"></script>
+    <script src="/admin/js/inventory.js?v=minmax1"></script>
     <script src="/admin/js/supplier.js?v=no-policy1"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -5632,6 +5630,6 @@ document.querySelectorAll('#dashboard .ad-dash-tab').forEach((btn) => {
     btn.addEventListener('click', () => window.switchAdminDashPanel(btn.dataset.adPanel));
 });
 </script>
-<script src="/assets/theme.js?v=push3"></script>
+<script src="/assets/theme.js?v=push4"></script>
 </body>
 </html>
