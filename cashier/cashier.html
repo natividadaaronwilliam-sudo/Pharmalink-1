@@ -960,18 +960,74 @@ window.completeDashOrder = function(orderId) {
     setTimeout(waitForProducts, 40);
 };
 
-function fetchOnlineOrders() {
-    const onlineOrdersBody = document.getElementById('onlineOrdersBody');
+let onlineOrdersFingerprint = '';
+
+function onlineOrdersKey(orders) {
+    return JSON.stringify((orders || []).map((o) => [
+        o.order_id, o.status, o.status_class, o.payment_status, o.customer_name, o.display_id
+    ]));
+}
+
+function updatePendingOrdersBadge(orders) {
     const pendingOrdersBadge = document.getElementById('pendingOrdersBadge');
+    if (!pendingOrdersBadge) return;
+    const pendingCount = (orders || []).filter((order) => {
+        const statusClass = String(order.status_class || '');
+        return statusClass.includes('pending') || statusClass.includes('processing') || statusClass.includes('ready');
+    }).length;
+    if (pendingCount > 0) {
+        pendingOrdersBadge.textContent = pendingCount;
+        pendingOrdersBadge.style.display = 'inline';
+    } else {
+        pendingOrdersBadge.style.display = 'none';
+    }
+}
+
+function paintOnlineOrdersTable(orders) {
+    const onlineOrdersBody = document.getElementById('onlineOrdersBody');
+    if (!onlineOrdersBody) return;
+    if (!orders.length) {
+        onlineOrdersBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">No online orders currently pending or ready.</td></tr>';
+        return;
+    }
+    onlineOrdersBody.innerHTML = orders.map((order) => {
+        const statusClass = String(order.status_class || '');
+        let actionButton = '-';
+        if (statusClass.includes('pending') || statusClass.includes('processing')) {
+            actionButton = `<button type="button" class="btn-review" onclick="reviewOrder('${order.order_id}')"
+                style="background:#f0ad4e; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Review</button>`;
+        } else if (statusClass.includes('ready')) {
+            actionButton = `<button type="button" class="btn-complete" onclick="loadOrderToCart('${order.order_id}')"
+                style="background:#5cb85c; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Load to Cart</button>`;
+        }
+        return `<tr>
+            <td>${dashEsc(order.display_id)}</td>
+            <td>${dashEsc(order.customer_name)}</td>
+            <td><span class="status ${dashEsc(statusClass)}" style="padding: 2px 8px; border-radius: 5px; font-size: 0.9em; background: #f4f4ff;">${dashEsc(order.status)}</span></td>
+            <td>${dashEsc(onlinePayLabel(order))}</td>
+            <td>${actionButton}</td>
+        </tr>`;
+    }).join('');
+}
+
+function fetchOnlineOrders(opts) {
+    const silent = !!(opts && opts.silent);
+    const onlineOrdersBody = document.getElementById('onlineOrdersBody');
     const dashBody = document.getElementById('dashPendingOrdersBody');
+    const reviewModal = document.getElementById('orderReviewModal');
+    const reviewOpen = !!(reviewModal && (
+        reviewModal.classList.contains('open') ||
+        (reviewModal.style.display && reviewModal.style.display !== 'none')
+    ));
 
     if (!onlineOrdersBody && !dashBody) return;
+    if (silent && reviewOpen) return;
 
-    if (onlineOrdersBody) {
+    if (onlineOrdersBody && !silent) {
         onlineOrdersBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">' +
                                      '<i class="fas fa-spinner fa-spin"></i> Loading online orders...</td></tr>';
     }
-    if (dashBody && !dashOrdersRows.length) {
+    if (dashBody && !silent && !dashOrdersRows.length) {
         dashBody.innerHTML = '<tr><td colspan="4" class="cs-empty">Loading orders...</td></tr>';
     }
 
@@ -979,67 +1035,23 @@ function fetchOnlineOrders() {
         .then(res => res.json())
         .then(data => {
             const orders = data.success && Array.isArray(data.orders) ? data.orders : [];
+            const fp = onlineOrdersKey(orders);
+            updatePendingOrdersBadge(orders);
+            if (silent && fp === onlineOrdersFingerprint) return;
+            onlineOrdersFingerprint = fp;
             renderDashPendingOrders(orders);
-            if (!onlineOrdersBody) return;
-            onlineOrdersBody.innerHTML = "";
-
-            if (orders.length > 0) {
-                let pendingCount = 0;
-
-                orders.forEach(order => {
-                    const statusClass = order.status_class;
-                    let actionButton = '';
-
-                    if (statusClass.includes('pending') || statusClass.includes('processing')) {
-                        actionButton = `<button class="btn-review" onclick="reviewOrder('${order.order_id}')"
-                                        style="background:#f0ad4e; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">
-                                            Review
-                                        </button>`;
-                        pendingCount++;
-                    } else if (statusClass.includes('ready')) {
-                        actionButton = `<button class="btn-complete" onclick="loadOrderToCart('${order.order_id}')"
-                                        style="background:#5cb85c; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">
-                                            Load to Cart
-                                        </button>`;
-                        pendingCount++;
-                    } else {
-                        actionButton = '-';
-                    }
-
-                    const row = `
-                        <tr>
-                            <td>${order.display_id}</td>
-                            <td>${order.customer_name}</td>
-                            <td><span class="status ${statusClass}" style="padding: 2px 8px; border-radius: 5px; font-size: 0.9em; background: #f4f4ff;">${order.status}</span></td>
-                            <td>${onlinePayLabel(order)}</td>
-                            <td>${actionButton}</td>
-                        </tr>
-                    `;
-                    onlineOrdersBody.innerHTML += row;
-                });
-
-                if (pendingOrdersBadge) {
-                    if (pendingCount > 0) {
-                        pendingOrdersBadge.textContent = pendingCount;
-                        pendingOrdersBadge.style.display = 'inline';
-                    } else {
-                        pendingOrdersBadge.style.display = 'none';
-                    }
-                }
-            } else {
-                onlineOrdersBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px;">No online orders currently pending or ready.</td></tr>`;
-                if (pendingOrdersBadge) pendingOrdersBadge.style.display = 'none';
-            }
+            paintOnlineOrdersTable(orders);
         })
         .catch(err => {
             console.error("Error fetching online orders:", err);
+            if (silent) return;
             if (onlineOrdersBody) {
-                onlineOrdersBody.innerHTML = `<tr><td colspan="5" style="color:red; text-align: center;">Failed to load online orders.</td></tr>`;
+                onlineOrdersBody.innerHTML = '<tr><td colspan="5" style="color:red; text-align: center;">Failed to load online orders.</td></tr>';
             }
             if (dashBody) {
                 dashBody.innerHTML = '<tr><td colspan="4" class="cs-empty">Failed to load online orders.</td></tr>';
             }
-            if (pendingOrdersBadge) pendingOrdersBadge.style.display = 'none';
+            updatePendingOrdersBadge([]);
         });
 }
 
@@ -1062,8 +1074,7 @@ function switchPOSMode(mode) {
         ordersContent.style.display = 'block';
         modeProductsBtn.classList.remove('active-mode');
         modeOrdersBtn.classList.add('active-mode');
-        // I-fetch/i-render dito ang listahan ng orders sa onlineOrdersBody
-fetchOnlineOrders();
+        fetchOnlineOrders({ silent: !!onlineOrdersFingerprint });
 
 } else { // 'standard' mode
         standardContent.style.display = 'block';
@@ -3438,7 +3449,7 @@ setInterval(() => {
 // Polls the online orders list + badge every 10s so a new customer checkout,
 // or a status change made from another cashier terminal, shows up automatically.
 setInterval(() => {
-    fetchOnlineOrders();
+    fetchOnlineOrders({ silent: true });
 }, 10000);
 
 // ===== REAL-TIME POS STOCK =====
