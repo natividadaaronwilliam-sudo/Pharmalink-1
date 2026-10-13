@@ -493,7 +493,6 @@
                     <button type="button" class="inv-tab-btn active" data-inv-panel="lots"><i class="fas fa-boxes"></i> Stock Lots</button>
                     <button type="button" class="inv-tab-btn" data-inv-panel="history"><i class="fas fa-clock-rotate-left"></i> Adjustment History</button>
                     <button type="button" class="inv-tab-btn" data-inv-panel="reorder"><i class="fas fa-cart-plus"></i> Reorder Suggestions</button>
-                    <button type="button" id="runConsignmentCheckBtn" title="This also runs every hour with the stock and expiry check. Use this only if you want the marks right now."><i class="fas fa-rotate"></i> Refresh consignment marks</button>
                 </div>
 
                 <div class="dashboard-cards inv-stats">
@@ -558,7 +557,6 @@
                                     <th>Minimum Stock</th>
                                     <th>Price</th>
                                     <th>Supplier</th>
-                                    <th>Return</th>
                                     <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
@@ -2627,11 +2625,6 @@
             }
             // Only "needs reorder" rows are selectable for a draft PO -
             // overstocked/sufficient rows have nothing to order.
-            if (r.procurement_type === 'consignment') {
-                if (r.consignment_policy === 'returnable') note += ' Near-expiry stock can be returned, so it is not counted.';
-                else if (r.consignment_policy === 'non_returnable') note += ' Cannot be returned, so it is ordered like a purchase.';
-                else note += ' No return policy, so this stays a manual PO.';
-            }
             const checkboxCell = r.action === 'increase' && r.auto_po !== false
                 ? `<input type="checkbox" class="reorder-select-cb" data-drug-id="${r.drug_id}" ${reorderSelectedIds.has(r.drug_id) ? 'checked' : ''}>`
                 : '';
@@ -2643,7 +2636,7 @@
                 <td>${checkboxCell}</td>
                 <td>${label}</td>
                 <td>${r.category}</td>
-                <td>${r.procurement_type === 'consignment' ? ('Consignment' + (r.consignment_policy === 'returnable' ? ' · Returnable' : (r.consignment_policy === 'non_returnable' ? ' · Non-returnable' : ' · No policy'))) : 'Purchase'}</td>
+                <td>${r.procurement_type === 'consignment' ? 'Consignment' : 'Purchase'}</td>
                 <td>${r.current_stock}</td>
                 <td>${r.minimum_stock}</td>
                 <td>${r.avg_daily_sales}</td>
@@ -3846,7 +3839,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <select id="new_procurement_type" required>
                     <option value="">Select procurement</option>
                     <option value="purchase">Purchased stock</option>
-                    <option value="consignment">Consignment (manual - not auto-ordered)</option>
+                    <option value="consignment">Consignment</option>
                 </select>
                 <label for="new_barcode">Barcode (optional):</label>
                 <div class="barcode-input-row">
@@ -3894,7 +3887,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <select id="edit_procurement_type" required>
                     <option value="">Select procurement</option>
                     <option value="purchase">Purchased stock</option>
-                    <option value="consignment">Consignment (manual - not auto-ordered)</option>
+                    <option value="consignment">Consignment</option>
                 </select>
                 <label for="edit_barcode">Barcode:</label>
                 <div class="barcode-input-row">
@@ -4069,8 +4062,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
-    <script src="/admin/js/inventory.js?v=markup-pct1"></script>
-    <script src="/admin/js/supplier.js?v=mobile-fit1"></script>
+    <script src="/admin/js/inventory.js?v=no-policy1"></script>
+    <script src="/admin/js/supplier.js?v=no-policy1"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // Flag to ensure User Management events are initialized only once
@@ -5557,10 +5550,6 @@ loadSalesAnalytics();
                     else if (mail.error) emailNote = ' Email was not sent: ' + mail.error;
                     else emailNote = ' No new low-stock or expiry alerts to email.';
                 }
-                const consign = mode === 'daily'
-                    ? (data.result && data.result.hourly && data.result.hourly.consignment)
-                    : (data.result && data.result.consignment);
-                if (consign && consign.updated) emailNote += ' Marked ' + consign.updated + ' consignment lot(s).';
                 let poNote = '';
                 if (mode === 'daily' && data.result && data.result.purchase_orders) {
                     const pos = data.result.purchase_orders;

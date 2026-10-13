@@ -566,24 +566,8 @@ def compute_reorder_suggestions() -> dict:
         procurement = str(row.get("procurement_type") or "purchase").lower()
         if procurement not in {"purchase", "consignment"}:
             procurement = "purchase"
-        policy = normalize_consignment_policy(row.get("supplier_consignment_policy"))
-        soon_expiry = int(row.get("soon_expiry_qty") or 0)
         stock_for_order = current
-        policy_note = ""
         auto_po = True
-        if procurement == "consignment":
-            if policy == "returnable":
-                stock_for_order = max(0, current - min(soon_expiry, current))
-                policy_note = (
-                    f" Returnable consignment: {soon_expiry} piece(s) expire within {NEAR_EXPIRY_DAYS} days and are not counted as stock to keep."
-                    if soon_expiry
-                    else " Returnable consignment: no near-expiry stock to return, so the order uses stock on hand."
-                )
-            elif policy == "non_returnable":
-                policy_note = " Non-returnable consignment: ordered like a purchase because this stock cannot be returned."
-            else:
-                auto_po = False
-                policy_note = " No consignment policy on the supplier, so this stays a manual purchase order."
         shown_rate = round(avg, 1) if avg >= 1 else round(avg, 2)
         rate_text = f"~{shown_rate}/day"
         forecast_n = int(round(predicted)) if predicted is not None else 0
@@ -599,11 +583,7 @@ def compute_reorder_suggestions() -> dict:
         if below_minimum or (has_demand and stock_for_order <= reorder_point):
             action = "increase"
             qty = max(1, int(math.ceil(target_stock - stock_for_order)))
-            counted = (
-                f" Unexpired stock is {current}, and {stock_for_order} of that is counted after the returnable near-expiry stock."
-                if stock_for_order != current
-                else f" Unexpired stock is {current}."
-            )
+            counted = f" Unexpired stock is {current}."
             reasoning = (
                 f"{signal}.{counted} Order {qty} to cover that forecast and still keep the minimum of {minimum}."
                 if has_demand
@@ -631,8 +611,6 @@ def compute_reorder_suggestions() -> dict:
                 if has_demand
                 else "No recent sales, and stock is within a reasonable range of the minimum."
             )
-        if policy_note:
-            reasoning = f"{reasoning}{policy_note}"
         suggestions.append({
             "drug_id": int(row["drug_id"]),
             "generic_name": row["generic_name"],
@@ -641,9 +619,7 @@ def compute_reorder_suggestions() -> dict:
             "form": row["form"],
             "category": row["category"],
             "procurement_type": procurement,
-            "consignment_policy": policy if procurement == "consignment" else "none",
             "auto_po": auto_po,
-            "soon_expiry_qty": soon_expiry if procurement == "consignment" and policy == "returnable" else 0,
             "current_stock": current,
             "minimum_stock": minimum,
             "avg_daily_sales": round(avg, 2),
@@ -673,7 +649,6 @@ def compute_reorder_suggestions() -> dict:
             "sales_window_days": window,
             "demand_model": demand_engine,
             "unexpired_stock_only": True,
-            "consignment": "Returnable near-expiry stock is left out of the order qty. Non-returnable consignment is ordered like a purchase. A consignment supplier with no policy stays manual.",
         },
         "suggestions": suggestions,
     }
@@ -968,76 +943,26 @@ def apply_received_lot(cur, drug_id: int, lot_number: str, expiration_date, qty:
 
 
 NEAR_EXPIRY_DAYS = 90
-CONSIGNMENT_POLICIES = {"none", "returnable", "non_returnable"}
-
-
-def normalize_consignment_policy(value) -> str:
-    raw = str(value or "none").strip().lower().replace("-", "_").replace(" ", "_")
-    if raw in {"nonreturnable", "non_returnable", "not_returnable"}:
-        return "non_returnable"
-    if raw == "returnable":
-        return "returnable"
-    return "none"
 
 
 def run_consignment_cross_check() -> dict:
-    """Mark near-expiry lots returnable or non-returnable from the supplier policy."""
-    marked_returnable = 0
-    marked_non_returnable = 0
+    """Clear leftover return marks. The company does not use a consignment policy."""
     cleared = 0
     with get_conn() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT l.lot_inventory_id, s.consignment_policy
-                FROM inventory_lots l
-                JOIN suppliers s ON l.supplier = s.supplier_id
-                WHERE l.is_active = 1
-                  AND COALESCE(l.current_stock, 0) > 0
-                  AND l.expiration_date >= CURRENT_DATE
-                  AND l.expiration_date <= CURRENT_DATE + %s * INTERVAL '1 day'
-                  AND LOWER(COALESCE(s.consignment_policy, 'none')) IN ('returnable', 'non_returnable')
-                """,
-                (NEAR_EXPIRY_DAYS,),
-            )
-            rows = cur.fetchall()
-            for row in rows:
-                policy = normalize_consignment_policy(row.get("consignment_policy"))
-                if policy not in {"returnable", "non_returnable"}:
-                    continue
-                cur.execute(
-                    "UPDATE inventory_lots SET return_status = %s WHERE lot_inventory_id = %s",
-                    (policy, int(row["lot_inventory_id"])),
-                )
-                if policy == "returnable":
-                    marked_returnable += 1
-                else:
-                    marked_non_returnable += 1
-            cur.execute(
-                """
-                UPDATE inventory_lots l
+                UPDATE inventory_lots
                 SET return_status = NULL
-                WHERE l.return_status IS NOT NULL
-                  AND NOT (
-                    l.is_active = 1
-                    AND COALESCE(l.current_stock, 0) > 0
-                    AND l.expiration_date >= CURRENT_DATE
-                    AND l.expiration_date <= CURRENT_DATE + %s * INTERVAL '1 day'
-                    AND EXISTS (
-                        SELECT 1 FROM suppliers s
-                        WHERE s.supplier_id = l.supplier
-                          AND LOWER(COALESCE(s.consignment_policy, 'none')) IN ('returnable', 'non_returnable')
-                    )
-                  )
-                """,
-                (NEAR_EXPIRY_DAYS,),
+                WHERE return_status IS NOT NULL
+                """
             )
             cleared = cur.rowcount or 0
     return {
         "success": True,
-        "updated": marked_returnable + marked_non_returnable,
-        "returnable": marked_returnable,
-        "non_returnable": marked_non_returnable,
+        "updated": 0,
+        "returnable": 0,
+        "non_returnable": 0,
         "cleared": cleared,
         "window_days": NEAR_EXPIRY_DAYS,
     }

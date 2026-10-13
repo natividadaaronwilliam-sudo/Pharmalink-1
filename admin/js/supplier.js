@@ -163,12 +163,6 @@
                     <input type="email" id="sf-email" value="${isEdit ? escapeHtml(supplier.email) : ''}">
                     <label for="sf-address">Address</label>
                     <input type="text" id="sf-address" value="${isEdit ? escapeHtml(supplier.address) : ''}">
-                    <label for="sf-consignment">Consignment</label>
-                    <select id="sf-consignment">
-                        <option value="none" ${!isEdit || !supplier.consignment_policy || supplier.consignment_policy === 'none' ? 'selected' : ''}>None</option>
-                        <option value="returnable" ${isEdit && supplier.consignment_policy === 'returnable' ? 'selected' : ''}>Returnable</option>
-                        <option value="non_returnable" ${isEdit && supplier.consignment_policy === 'non_returnable' ? 'selected' : ''}>Non-returnable</option>
-                    </select>
                     ${isEdit ? `
                     <label for="sf-status">Status</label>
                     <select id="sf-status">
@@ -204,8 +198,7 @@
                 name: overlay.querySelector('#sf-name').value.trim(),
                 contact: overlay.querySelector('#sf-contact').value.trim(),
                 email: overlay.querySelector('#sf-email').value.trim(),
-                address: overlay.querySelector('#sf-address').value.trim(),
-                consignment_policy: overlay.querySelector('#sf-consignment')?.value || 'none'
+                address: overlay.querySelector('#sf-address').value.trim()
             };
             if (!payload.name) {
                 alert('Supplier name is required.');
@@ -253,7 +246,6 @@
                 contact: supplier.contact_number,
                 email: supplier.email,
                 address: supplier.address,
-                consignment_policy: supplier.consignment_policy || 'none',
                 status,
                 inactive_reason: reason
             })

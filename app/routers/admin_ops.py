@@ -1196,9 +1196,6 @@ async def create_pos_from_reorder(request: Request):
             skipped.append({"name": f"Drug #{drug_id}", "reason": "not in current suggestions"})
             continue
         label = row.get("generic_name") or f"Drug #{drug_id}"
-        if row.get("auto_po") is False:
-            skipped.append({"name": label, "reason": "consignment supplier has no return policy - create that PO manually"})
-            continue
         if row.get("action") != "increase" or int(row.get("suggested_qty") or 0) <= 0:
             skipped.append({"name": label, "reason": "does not need reorder"})
             continue

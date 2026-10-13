@@ -11,7 +11,7 @@ from psycopg2 import IntegrityError
 from psycopg2.extras import RealDictCursor
 
 from app.activity import actor_display_name, write_activity_log
-from app.automation import normalize_consignment_policy, run_consignment_cross_check
+from app.automation import run_consignment_cross_check
 from app.db import fetch_all, fetch_one, get_conn, next_id
 from app.deps import require_admin
 from app.pricing import reprice_lots_for_category, resolve_selling_price
@@ -932,7 +932,7 @@ async def add_supplier(request: Request):
     data = await request.json()
     if not data or not data.get("name"):
         return {"success": False, "message": "Invalid input"}
-    policy = normalize_consignment_policy(data.get("consignment_policy"))
+    policy = "none"
     with get_conn() as conn:
         with conn.cursor() as cur:
             sid = next_id(cur, "suppliers", "supplier_id")
@@ -962,7 +962,7 @@ async def update_supplier(request: Request):
         inactive_reason = None
     elif not inactive_reason:
         inactive_reason = "Manually deactivated by admin"
-    policy = normalize_consignment_policy(data.get("consignment_policy"))
+    policy = "none"
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
