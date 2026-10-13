@@ -24,6 +24,7 @@ LEAD_DAYS = 7
 TARGET_DAYS = 30
 OVERSTOCK_DAYS = 90
 SALES_WINDOW_DAYS = 30
+MAX_STOCK = 500
 
 _scheduler = None
 _last_run: dict = {}
@@ -561,55 +562,28 @@ def compute_reorder_suggestions() -> dict:
             source = "recent_average"
         has_demand = avg > 0
         days_of_stock = round(current / avg, 1) if has_demand else None
-        reorder_point = (avg * lead) + minimum
-        target_stock = (avg * target) + minimum
         procurement = str(row.get("procurement_type") or "purchase").lower()
         if procurement not in {"purchase", "consignment"}:
             procurement = "purchase"
-        stock_for_order = current
         auto_po = True
-        shown_rate = round(avg, 1) if avg >= 1 else round(avg, 2)
-        rate_text = f"~{shown_rate}/day"
-        forecast_n = int(round(predicted)) if predicted is not None else 0
-        unit_word = "unit" if forecast_n == 1 else "units"
-        if source == "prophet":
-            signal = f"Prophet forecast: {rate_text} for the next {target} days (about {forecast_n} {unit_word})"
-        elif sold > 0:
-            signal = f"Recent {window}-day average {rate_text} (Prophet needs at least 2 sale days for this medicine)"
-        else:
-            signal = ""
         action, qty, reduce_qty, reasoning = "ok", 0, 0, ""
-        below_minimum = minimum > 0 and stock_for_order <= minimum
-        if below_minimum or (has_demand and stock_for_order <= reorder_point):
-            action = "increase"
-            qty = max(1, int(math.ceil(target_stock - stock_for_order)))
-            counted = f" Unexpired stock is {current}."
-            reasoning = (
-                f"{signal}.{counted} Order {qty} to cover that forecast and still keep the minimum of {minimum}."
-                if has_demand
-                else f"Stock counted for reorder is at or below minimum ({minimum}); no forecasted demand - minimum-buffer refill."
-            )
-        elif has_demand and days_of_stock is not None and days_of_stock > overstock:
+        if current <= minimum:
+            qty = max(0, MAX_STOCK - current)
+            if qty > 0:
+                action = "increase"
+                reasoning = (
+                    f"Stock is {current}, at or below the minimum of {minimum}. "
+                    f"Order {qty} to bring it back to {MAX_STOCK}."
+                )
+            else:
+                reasoning = f"Stock is {current}, already at the maximum of {MAX_STOCK}."
+        elif current > MAX_STOCK:
             action = "decrease"
-            qty = 0
-            reduce_qty = max(0, current - max(minimum, int(math.ceil(target_stock))))
-            reasoning = (
-                f"{signal}. This covers ~{days_of_stock} days - pause reorders"
-                + (f" (about {reduce_qty} units above the {target}-day target)." if reduce_qty else ".")
-            )
-        elif not has_demand and current > minimum * 3 and minimum > 0:
-            action = "decrease"
-            qty = 0
-            reduce_qty = max(0, current - minimum)
-            reasoning = (
-                f"No sales in {window} days, and stock ({current}) is well above minimum ({minimum})"
-                + (f" - {reduce_qty} units can wait." if reduce_qty else ".")
-            )
+            reduce_qty = current - MAX_STOCK
+            reasoning = f"Stock is {current}, above the maximum of {MAX_STOCK} by {reduce_qty} pieces."
         else:
             reasoning = (
-                f"{signal}. {days_of_stock} days of stock - sufficient."
-                if has_demand
-                else "No recent sales, and stock is within a reasonable range of the minimum."
+                f"Stock is {current}, between the minimum of {minimum} and the maximum of {MAX_STOCK}."
             )
         suggestions.append({
             "drug_id": int(row["drug_id"]),
@@ -649,6 +623,8 @@ def compute_reorder_suggestions() -> dict:
             "sales_window_days": window,
             "demand_model": demand_engine,
             "unexpired_stock_only": True,
+            "reorder_when": "at_or_below_minimum",
+            "order_up_to": MAX_STOCK,
         },
         "suggestions": suggestions,
     }
@@ -750,7 +726,7 @@ def create_auto_purchase_orders() -> dict:
         and s.get("auto_po", True)
     ]
     notes = (
-        "This is an automatic order. PharmaLink prepared it from the stock we expect to need in the next 30 days."
+        "This is an automatic order. Stock reached the minimum, so PharmaLink ordered enough to bring it back up to 500."
     )
     result = create_purchase_orders_from_needs(needs, "System", notes, raise_alerts=True)
     from app.routers.admin_ops import send_saved_purchase_order
