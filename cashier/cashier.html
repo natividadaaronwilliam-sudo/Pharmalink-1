@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PharmaLink System - Cashier/Pharmacist Dashboard</title>
-    <link rel="stylesheet" href="/assets/theme.css?v=date-fit1">
-    <link rel="stylesheet" href="/cashier/css/cashier.css?v=pos-modal1">
+    <link rel="stylesheet" href="/assets/theme.css?v=pos-check1">
+    <link rel="stylesheet" href="/cashier/css/cashier.css?v=pos-check1">
     <link rel="stylesheet" href="/shared/css/segmentation.css?v=palette-w4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -265,11 +265,11 @@
     <div class="pos-loyalty-pts">
         <i class="fas fa-coins"></i> Available Points: <span id="availablePointsDisplay">0.00</span>
     </div>
-    <label>
+    <label class="pos-check-line" for="applyPointsToggle">
         <input type="checkbox" id="applyPointsToggle">
-        Apply Points as Discount (Max ₱<span id="maxPointsDiscountDisplay">0.00</span>)
-        <span id="loyaltyRateHint" style="display:block;font-size:12px;color:#4BAA8B;margin-top:4px;"></span>
+        <span class="pos-check-text">Apply points (max ₱<span id="maxPointsDiscountDisplay">0.00</span>)</span>
     </label>
+    <span id="loyaltyRateHint"></span>
 </div>
 
             <table class="pos-cart-table">
@@ -282,7 +282,7 @@
                 <div class="pos-scpwd">
                     <label for="scPwdToggle">
                         <input type="checkbox" id="scPwdToggle">
-                        <span id="scPwdLabel">Apply Senior Citizen/PWD Discount (20%)</span>
+                        <span id="scPwdLabel">SC/PWD Discount (20%)</span>
                     </label>
                 </div>
 
@@ -805,7 +805,7 @@ function applyCheckoutRates(data) {
     if (data && Number.isFinite(Number(data.vat_percent))) TAX_RATE = Number(data.vat_percent) / 100;
     if (data && Number.isFinite(Number(data.sc_pwd_percent))) SC_PWD_RATE = Number(data.sc_pwd_percent) / 100;
     const scLabel = document.getElementById('scPwdLabel');
-    if (scLabel) scLabel.textContent = `Apply Senior Citizen/PWD Discount (${formatCheckoutPercent(SC_PWD_RATE)}%)`;
+    if (scLabel) scLabel.textContent = `SC/PWD Discount (${formatCheckoutPercent(SC_PWD_RATE)}%)`;
     const label = document.getElementById('taxLabel');
     if (label) label.textContent = `Tax (${formatCheckoutPercent(TAX_RATE)}%):`;
     if (typeof updateCart === 'function') updateCart();

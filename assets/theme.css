@@ -709,6 +709,16 @@ input, textarea, select, .p-input{
   background:var(--ph-surface);
   transition:border-color var(--ph-fast), box-shadow var(--ph-fast);
 }
+input[type="checkbox"],
+input[type="radio"]{
+  width:auto;
+  height:auto;
+  padding:0;
+  margin:0;
+  border:none;
+  box-shadow:none;
+  background:transparent;
+}
 input:focus, textarea:focus, select:focus{
   outline:none;
   border-color:var(--ph-primary-500);
