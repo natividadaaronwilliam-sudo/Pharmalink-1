@@ -583,9 +583,40 @@
         });
     }
 
+    function formatNotifWhen(iso, fallback) {
+      if (!iso) return fallback || '';
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return fallback || '';
+      var sec = Math.round((Date.now() - d.getTime()) / 1000);
+      var clock = d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
+      if (sec < 45) return 'Just now';
+      if (sec < 3600) {
+        var mins = Math.max(1, Math.floor(sec / 60));
+        return mins === 1 ? '1 minute ago' : mins + ' minutes ago';
+      }
+      var startToday = new Date();
+      startToday.setHours(0, 0, 0, 0);
+      if (d >= startToday) return 'Today, ' + clock;
+      var startY = new Date(startToday);
+      startY.setDate(startY.getDate() - 1);
+      if (d >= startY) return 'Yesterday, ' + clock;
+      return d.toLocaleString('en-PH', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+
     function render(notifications) {
       notesByKey = {};
-      (notifications || []).forEach(function (n) {
+      notifications = (notifications || []).slice().sort(function (a, b) {
+        var ta = Date.parse((a && a.date_iso) || '') || 0;
+        var tb = Date.parse((b && b.date_iso) || '') || 0;
+        return tb - ta;
+      });
+      notifications.forEach(function (n) {
         if (n && n.notif_key) notesByKey[n.notif_key] = n;
       });
       if (!notifications || notifications.length === 0) {
@@ -593,8 +624,9 @@
         return;
       }
       dropdown.innerHTML = notifications.map(function (n) {
-        var dateLine = n.date
-          ? '<br><small style="color:#9ca3af;">' + escHtml(n.date) + '</small>'
+        var when = formatNotifWhen(n.date_iso, n.date);
+        var dateLine = when
+          ? '<br><small class="staff-notif-when" style="color:#9ca3af;" data-iso="' + escHtml(n.date_iso || '') + '">' + escHtml(when) + '</small>'
           : '';
         return '<div class="staff-notif-item ' + escHtml(n.type) + '"' +
                ' data-notif-key="' + escHtml(n.notif_key) + '"' +
@@ -604,6 +636,7 @@
                '<i class="fas ' + iconFor(n.type) + '"></i>' +
                '<span>' + escHtml(n.message) + dateLine + '</span></div>';
       }).join('');
+      dropdown.scrollTop = 0;
 
       dropdown.querySelectorAll('.staff-notif-item[data-notif-key]').forEach(function (item) {
         item.addEventListener('click', function (e) {
@@ -631,6 +664,14 @@
       });
     }
 
+    function tickNotifTimes() {
+      dropdown.querySelectorAll('.staff-notif-when[data-iso]').forEach(function (el) {
+        var iso = el.getAttribute('data-iso') || '';
+        if (!iso) return;
+        el.textContent = formatNotifWhen(iso, el.textContent);
+      });
+    }
+
     function refresh() {
       fetch('/api/staff/notifications', { credentials: 'same-origin' })
         .then(function (res) { return res.json(); })
@@ -654,7 +695,8 @@
     });
 
     refresh();
-    setInterval(refresh, 30000);
+    setInterval(refresh, 8000);
+    setInterval(tickNotifTimes, 15000);
   });
 
   /* ---- 5. Logout Yes / No confirm (Admin, Cashier, Customer) ---- */
