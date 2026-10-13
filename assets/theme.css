@@ -1067,6 +1067,13 @@ button.login-btn:hover{ filter:brightness(1.08); }
 }
 @media (max-width: 640px){
   .profile-hero{ flex-direction:column; align-items:flex-start; }
+  #profile .profile-hero{
+    align-items:center; width:100%; text-align:center;
+  }
+  #profile .profile-hero-copy,
+  #profile .profile-hero-copy h3,
+  #profile .profile-username{ text-align:center; width:100%; }
+  #profile .profile-hero .profile-pill-row{ justify-content:center; }
   .profile-card-head{ flex-direction:column; }
   .profile-card-head .profile-action-row{ width:100%; }
 }

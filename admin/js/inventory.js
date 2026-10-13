@@ -489,24 +489,6 @@
             showModal('addDrugModal');
         });
         document.getElementById('closeAdjustStockModal')?.addEventListener('click', () => hideModal('adjustStockModal'));
-        document.getElementById('runConsignmentCheckBtn')?.addEventListener('click', () => {
-            fetch('/api/admin/lots/consignment-cross-check', { method: 'POST' })
-                .then(res => res.json())
-                .then(result => {
-                    if (!result.success) {
-                        alert(result.message || 'Cross-check failed.');
-                        return;
-                    }
-                    fetchLots();
-                    const n = Number(result.updated || 0);
-                    if (!n) {
-                        alert('No near-expiry lots were linked to a supplier with a consignment policy.');
-                        return;
-                    }
-                    alert('Cross-check done. Returnable: ' + (result.returnable || 0) + '. Non-returnable: ' + (result.non_returnable || 0) + '.');
-                })
-                .catch(err => alert('Error: ' + err.message));
-        });
 
         document.querySelectorAll('.inv-tab-btn[data-inv-panel]').forEach(btn => {
             btn.addEventListener('click', () => switchInvPanel(btn.getAttribute('data-inv-panel')));
@@ -960,7 +942,7 @@
             .catch(err => {
                 console.error('Failed to load inventory lots:', err);
                 const body = document.getElementById('inventoryBody');
-                if (body) body.innerHTML = '<tr><td colspan="14" class="inv-empty is-error">Failed to load inventory.</td></tr>';
+                if (body) body.innerHTML = '<tr><td colspan="13" class="inv-empty is-error">Failed to load inventory.</td></tr>';
             });
     }
 
@@ -1004,7 +986,7 @@
         updateInvPager('lots', paged.page, paged.pages, paged.total);
 
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="14" class="inv-empty">No stock lots found.</td></tr>';
+            body.innerHTML = '<tr><td colspan="13" class="inv-empty">No stock lots found.</td></tr>';
             return;
         }
 
@@ -1017,18 +999,6 @@
             const expClass = expired ? 'is-expired' : (expiringCritical ? 'is-critical' : (expiringSoon ? 'is-soon' : ''));
             const stockClass = l.current_stock === 0 ? 'is-out' : (l.current_stock <= l.minimum_stock ? 'is-low' : 'is-ok');
             const expTag = expired ? ' (expired)' : (expiringCritical ? ` (${daysLeft}d left ⚠️)` : (expiringSoon ? ` (${daysLeft}d left)` : ''));
-            const policy = String(l.supplier_consignment_policy || '').toLowerCase();
-            const hasPolicy = policy === 'returnable' || policy === 'non_returnable';
-            const status = String(l.return_status || '').toLowerCase();
-            const nearExpiry = !expired && daysLeft <= 90 && l.current_stock > 0;
-            let returnCell = '-';
-            if (status === 'returnable') {
-                returnCell = '<span class="inv-chip return-yes">Returnable</span>';
-            } else if (status === 'non_returnable') {
-                returnCell = '<span class="inv-chip return-no">Non-returnable</span>';
-            } else if (nearExpiry && hasPolicy) {
-                returnCell = '<span class="inv-chip return-flag">Marks on the next stock check</span>';
-            }
             return `
             <tr data-lot-id="${l.lot_inventory_id}">
                 <td>${escapeHtml(l.generic_name)}</td>
@@ -1042,7 +1012,6 @@
                 <td>${l.minimum_stock}</td>
                 <td>${money(l.price)}</td>
                 <td>${l.supplier && suppliersById[l.supplier] ? escapeHtml(suppliersById[l.supplier]) : '-'}</td>
-                <td>${returnCell}</td>
                 <td><span class="inv-badge ${isActive ? 'active' : 'archived'}">${isActive ? 'Active' : 'Archived'}</span></td>
                 <td class="action-btn-group">
                     <button type="button" class="inv-icon-btn adjust-stock-btn" title="Adjust Stock (with reason)"><i class="fas fa-sliders"></i></button>
@@ -1215,7 +1184,7 @@
         body.innerHTML = rows.map(r => `
             <tr data-category="${escapeHtml(r.category)}">
                 <td>${escapeHtml(r.category)}</td>
-                <td><input type="number" step="0.1" min="0" class="markup-input" value="${r.markup_percent}" style="width:90px;padding:5px 8px;border:1px solid #ccc;border-radius:4px;"> %</td>
+                <td><span class="maint-pct"><input type="number" step="0.1" min="0" class="markup-input" value="${r.markup_percent}"> <span>%</span></span></td>
                 <td><button type="button" class="save-markup-btn" style="background:#4BAA8B;color:#fff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;">Save</button></td>
             </tr>`).join('');
     }

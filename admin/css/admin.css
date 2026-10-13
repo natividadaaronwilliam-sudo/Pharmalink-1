@@ -821,6 +821,13 @@
 #maintenance .maint-loyalty-row{
   display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; padding:4px 0 8px;
 }
+#maintenance .maint-pct{
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+}
+#maintenance .maint-pct input{
+  width:84px !important; max-width:84px; flex:0 0 auto; margin:0;
+  padding:6px 8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;
+}
 
 .drug-pick{ min-width:0; width:100%; }
 .drug-pick-list{
@@ -1006,6 +1013,66 @@ button.drug-pick-item.is-active{
     width:calc(100vw - 16px) !important;
     max-width:calc(100vw - 16px) !important;
     max-height:88vh;
+  }
+  #consumption-pagination,
+  #capital-pagination{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:center;
+    gap:8px 12px;
+    width:100%;
+    max-width:100%;
+    margin-top:8px;
+  }
+  #consumption-pagination .um-page-btn,
+  #capital-pagination .um-page-btn{
+    flex:0 0 auto;
+    width:auto !important;
+  }
+  #consumption-page-info,
+  #capital-page-info{
+    order:-1;
+    flex:1 0 100%;
+    width:100%;
+    max-width:100%;
+    overflow:visible;
+    white-space:normal;
+    text-align:center;
+  }
+  #procurementReportModal .pc-grid{
+    grid-template-columns:minmax(0, 1fr);
+    width:100%;
+    min-width:0;
+  }
+  #procurementReportModal .pc-panel{
+    min-width:0;
+    max-width:100%;
+  }
+  #procurementReportModal .pc-panel .table-wrap{
+    max-height:220px;
+    margin:0;
+    overflow:auto;
+    max-width:100%;
+  }
+  #procurementReportModal .pc-panel table{
+    width:max-content;
+    min-width:100%;
+  }
+  #procurementReportModal .pc-panel th,
+  #procurementReportModal .pc-panel td:nth-child(n+2){
+    white-space:nowrap !important;
+  }
+  #procurementReportModal .pc-panel td:first-child{
+    white-space:normal !important;
+    overflow-wrap:break-word;
+    max-width:150px;
+  }
+  #procurementReportModal .pc-panel th{
+    position:sticky;
+    top:0;
+    z-index:1;
+    background:#fff;
   }
   #createPoModal .modal-content > div[style*="display:flex"],
   #viewPoModal .modal-content > div[style*="display:flex"]{
