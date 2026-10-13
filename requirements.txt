@@ -10,3 +10,5 @@ rapidocr-onnxruntime
 openpyxl
 fpdf2
 pywebpush
+numpy
+scikit-learn

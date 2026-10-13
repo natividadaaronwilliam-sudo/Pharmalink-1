@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import subprocess
+import sys
 from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
@@ -1269,7 +1270,9 @@ def segmentation(request: Request):
             "total_spent": amt,
         })
 
-    fingerprint = hashlib.md5(json.dumps(spend_customers, default=str).encode()).hexdigest()
+    fingerprint = hashlib.md5(
+        json.dumps({"kmeans": 2, "customers": spend_customers}, default=str).encode()
+    ).hexdigest()
     cache_file = ROOT / "cache" / "segment_kmeans_cache.json"
     stored_k = 3
     if cache_file.exists():
@@ -1278,10 +1281,14 @@ def segmentation(request: Request):
             stored_k = int(cached.get("active_k") or (cached.get("payload") or {}).get("active_k") or 3)
             if stored_k not in (2, 3, 4, 5):
                 stored_k = 3
-            if cached.get("fingerprint") == fingerprint and cached.get("payload"):
-                payload = cached["payload"]
-                payload["active_k"] = stored_k
-                return payload
+            cached_payload = cached.get("payload") or {}
+            if (
+                cached.get("fingerprint") == fingerprint
+                and cached_payload
+                and cached_payload.get("engine") == "kmeans"
+            ):
+                cached_payload["active_k"] = stored_k
+                return cached_payload
         except Exception:
             stored_k = 3
 
@@ -1296,6 +1303,8 @@ def segmentation(request: Request):
     engine = "quantile"
     silhouette = {}
     debug = {}
+    if not kmeans_results:
+        debug["kmeans"] = "scikit-learn did not return clusters"
     total = len(spend_customers)
     for n, labels in label_sets.items():
         counts = [0] * n
@@ -1324,6 +1333,8 @@ def segmentation(request: Request):
             engine = "kmeans"
             if result.get("silhouette_score") is not None:
                 silhouette[n] = result["silhouette_score"]
+        elif result and result.get("error"):
+            debug[str(n)] = result.get("error")
         if not used and total > 0:
             for idx, amt in enumerate(spend_data):
                 bucket = min(n - 1, int((idx / total) * n))
@@ -1386,10 +1397,9 @@ async def segmentation_config(request: Request):
 
 
 def _run_kmeans(spend_customers):
-    script = ROOT / "python" / "segment_kmeans.py"
-    if not script.exists() or not spend_customers:
+    if not spend_customers:
         return None
-    payload = json.dumps({
+    payload = {
         "ks": [2, 3, 4, 5],
         "customers": [
             {
@@ -1400,15 +1410,30 @@ def _run_kmeans(spend_customers):
             }
             for c in spend_customers
         ],
-    })
-    for cmd in (["python", str(script)], ["py", "-3", str(script)]):
-        try:
-            proc = subprocess.run(cmd, input=payload, capture_output=True, text=True, timeout=20)
-            if proc.returncode != 0:
-                continue
-            decoded = json.loads(proc.stdout or "{}")
-            if decoded.get("success"):
-                return decoded.get("results")
-        except Exception:
-            continue
+    }
+    python_dir = str(ROOT / "python")
+    if python_dir not in sys.path:
+        sys.path.insert(0, python_dir)
+    try:
+        import segment_kmeans as skm
+        return skm.cluster_payload(payload)
+    except Exception as exc:
+        logger.warning("K-Means in-process failed: %s", exc)
+    script = ROOT / "python" / "segment_kmeans.py"
+    if not script.exists():
+        return None
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        decoded = json.loads(proc.stdout or "{}")
+        if decoded.get("success"):
+            return decoded.get("results")
+        logger.warning("K-Means subprocess failed: %s %s", proc.returncode, (proc.stderr or decoded.get("error") or "").strip())
+    except Exception as exc:
+        logger.warning("K-Means subprocess error: %s", exc)
     return None
