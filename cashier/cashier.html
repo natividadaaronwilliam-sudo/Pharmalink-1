@@ -483,7 +483,7 @@
             </select>
         </label>
         <label for="srSearch" class="sr-search">Search
-            <input type="text" id="srSearch" placeholder="Txn ID, customer, cashier, reference" autocomplete="off">
+            <input type="text" id="srSearch" placeholder="Txn ID, order no, customer, cashier, reference" autocomplete="off">
         </label>
         <button type="button" id="srApplyBtn"><i class="fas fa-filter"></i> Apply</button>
         <button type="button" id="srPrintBtn" class="sr-print-btn"><i class="fas fa-print"></i> Print</button>
@@ -1158,7 +1158,7 @@ window.clearCart = function() {
  */
 function printReceipt(responseData, saleData, printWindow) {
     const transactionId = responseData.transaction_id || 'N/A';
-    const date = new Date().toLocaleString();
+    const date = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
     
     // ⭐ FIX #1: GUMAMIT NG TAMANG LOGIC PARA SA CUSTOMER DISPLAY ⭐
     let customerDisplay;
@@ -2221,7 +2221,7 @@ console.log("Dashboard Inputs Found. Setting defaults...");
         const endDateObj = new Date();
         const startDateObj = new Date();
         startDateObj.setDate(endDateObj.getDate() - 6);
-        const fmt = (d) => d.toISOString().split('T')[0];
+        const fmt = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
         startDateInput.value = fmt(startDateObj);
         endDateInput.value = fmt(endDateObj);
         
@@ -2242,7 +2242,7 @@ console.log("Dashboard Inputs Found. Setting defaults...");
         const endObj = new Date();
         const startObj = new Date();
         startObj.setDate(endObj.getDate() - 6);
-        const fmt = (d) => d.toISOString().split('T')[0];
+        const fmt = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
         srStart.value = fmt(startObj);
         srEnd.value = fmt(endObj);
     }
@@ -3155,10 +3155,11 @@ function updateDashboardStats(start, end) {
  */
 function recentTxRow(t) {
     const statusClass = String(t.status || '').toLowerCase().replace(/\s+/g, '-');
-    const transactionDate = new Date(t.date_created).toLocaleDateString('en-US', {
+    const transactionDate = t.date_display || new Date(t.date_created).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
-        year: 'numeric'
+        year: 'numeric',
+        timeZone: 'Asia/Manila'
     });
     return `<tr>
         <td>${dashEsc(transactionDate)}</td>
@@ -3282,7 +3283,7 @@ function loadSalesReport() {
             body.innerHTML = logs.map((t) => {
                 const pay = String(t.payment_method || 'cash').toLowerCase();
                 return '<tr>' +
-                    '<td>' + srEsc(t.transaction_id) + '</td>' +
+                    '<td>' + srEsc(t.transaction_id) + (t.order_no ? '<div style="font-size:0.8em;color:#64748b;">' + srEsc(t.order_no) + '</div>' : '') + '</td>' +
                     '<td>' + srEsc(t.date) + '</td>' +
                     '<td>' + srEsc(t.time) + '</td>' +
                     '<td>' + srEsc(t.customer_name) + '</td>' +
@@ -3355,6 +3356,7 @@ function reprintSalesReceipt(sale, items) {
         '<div class="border-top"></div>' +
         '<p>Date: ' + srEsc(sale.date || '') + '</p>' +
         '<p>Trans ID: ' + srEsc(sale.transaction_id || '') + '</p>' +
+        (sale.order_no ? '<p>Order: ' + srEsc(sale.order_no) + '</p>' : '') +
         '<p>' + srEsc(customer) + '</p>' +
         '<div class="border-bottom"></div>' +
         '<table><thead><tr><th style="text-align:left;width:30%;">QTY/Price</th><th style="text-align:left;">Description</th><th style="text-align:right;width:25%;">Amount</th></tr></thead><tbody>' +
@@ -3404,6 +3406,7 @@ function openSalesReportDetail(saleId) {
             ).join('') || '<tr><td colspan="4">No line items.</td></tr>';
             box.innerHTML =
                 '<p><strong>Date:</strong> ' + srEsc(s.date) + '</p>' +
+                (s.order_no ? '<p><strong>Order:</strong> ' + srEsc(s.order_no) + '</p>' : '') +
                 '<p><strong>Customer:</strong> ' + srEsc(s.customer_name) + '</p>' +
                 '<p><strong>Cashier:</strong> ' + srEsc(s.cashier_name) + '</p>' +
                 '<p><strong>Payment:</strong> ' + srEsc(srPayLabel(s.payment_method)) +

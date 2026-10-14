@@ -5,9 +5,10 @@ import os
 import random
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -40,15 +41,40 @@ def _title(value):
     return str(value or "").title()
 
 
-def _fmt_dt(value, fmt: str) -> str:
+_MANILA = ZoneInfo("Asia/Manila")
+
+
+def _dt_manila(value):
     if value is None:
-        return ""
+        return None
     if isinstance(value, str):
         try:
             value = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
-            return value
-    return value.strftime(fmt)
+            return None
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(_MANILA)
+
+
+def _fmt_dt(value, fmt: str) -> str:
+    dt = _dt_manila(value)
+    if dt is not None:
+        return dt.strftime(fmt)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _manila_now():
+    return datetime.now(_MANILA)
+
+
+def _sale_date_sql(alias=None):
+    col = f"{alias}.date_created" if alias else "date_created"
+    return f"(({col} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Manila')::date"
 
 
 @router.get("/products")
@@ -493,12 +519,12 @@ def daily_sales(request: Request):
         return _unauthorized()
     labels = []
     data = []
-    today = datetime.now().date()
+    today = _manila_now().date()
     for i in range(6, -1, -1):
         day = today - timedelta(days=i)
         labels.append(day.strftime("%a"))
         row = fetch_one(
-            "SELECT COALESCE(SUM(total_amount), 0) AS total FROM sales WHERE date_created::date = %s AND status = 'completed'",
+            f"SELECT COALESCE(SUM(total_amount), 0) AS total FROM sales WHERE {_sale_date_sql()} = %s AND status = 'completed'",
             (day.isoformat(),),
         )
         data.append(round(float(row["total"] or 0), 2))
@@ -509,15 +535,15 @@ def daily_sales(request: Request):
 def top_selling(request: Request, startDate: str = "", endDate: str = ""):
     if not require_staff(request):
         return _unauthorized()
-    start = startDate or datetime.now().strftime("%Y-%m-%d")
-    end = endDate or datetime.now().strftime("%Y-%m-%d")
+    start = startDate or _manila_now().strftime("%Y-%m-%d")
+    end = endDate or _manila_now().strftime("%Y-%m-%d")
     rows = fetch_all(
-        """
+        f"""
         SELECT d.generic_name, d.brand_name, COALESCE(SUM(si.quantity), 0) AS total_quantity_sold
         FROM sales_items si
         JOIN sales s ON si.sale_id = s.sale_id
         JOIN drugs_master d ON si.drug_id = d.drug_id
-        WHERE s.date_created::date BETWEEN %s AND %s
+        WHERE {_sale_date_sql("s")} BETWEEN %s AND %s
           AND s.status = 'completed'
         GROUP BY d.drug_id, d.generic_name, d.brand_name
         ORDER BY total_quantity_sold DESC
@@ -539,16 +565,16 @@ def top_selling(request: Request, startDate: str = "", endDate: str = ""):
 def recent_transactions(request: Request, startDate: str = "", endDate: str = ""):
     if not require_staff(request):
         return _unauthorized()
-    start = startDate or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-    end = endDate or datetime.now().strftime("%Y-%m-%d")
+    start = startDate or (_manila_now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    end = endDate or _manila_now().strftime("%Y-%m-%d")
     rows = fetch_all(
-        """
+        f"""
         SELECT s.date_created,
                COALESCE(CONCAT(c.first_name, ' ', c.last_name), 'Guest') AS customer_name,
                s.total_amount, s.status
         FROM sales s
         LEFT JOIN customers c ON s.customer_id = c.customer_id
-        WHERE s.date_created::date BETWEEN %s AND %s
+        WHERE {_sale_date_sql("s")} BETWEEN %s AND %s
         ORDER BY s.date_created DESC
         LIMIT 100
         """,
@@ -557,7 +583,8 @@ def recent_transactions(request: Request, startDate: str = "", endDate: str = ""
     out = []
     for row in rows:
         item = dict(row)
-        item["time_display"] = _fmt_dt(row["date_created"], "%H:%M")
+        item["date_display"] = _fmt_dt(row["date_created"], "%b %d, %Y")
+        item["time_display"] = _fmt_dt(row["date_created"], "%I:%M %p")
         item["total_amount"] = f"{float(row['total_amount'] or 0):.2f}"
         out.append(item)
     return out
@@ -567,8 +594,8 @@ def recent_transactions(request: Request, startDate: str = "", endDate: str = ""
 def sales_report(request: Request, startDate: str = "", endDate: str = "", q: str = "", payment: str = ""):
     if not require_staff(request):
         return _unauthorized()
-    start = startDate or (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d")
-    end = endDate or datetime.now().strftime("%Y-%m-%d")
+    start = startDate or (_manila_now() - timedelta(days=6)).strftime("%Y-%m-%d")
+    end = endDate or _manila_now().strftime("%Y-%m-%d")
     needle = (q or "").strip().lower()
     pay = (payment or "").strip().lower()
     params: list = [start, end]
@@ -583,6 +610,8 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
             OR LOWER(COALESCE(s.payment_reference, '')) LIKE %s
             OR LOWER(COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '')) LIKE %s
             OR LOWER(COALESCE(st.first_name, '') || ' ' || COALESCE(st.last_name, '')) LIKE %s
+            OR CAST(s.online_order_id AS TEXT) LIKE %s
+            OR LOWER('ord-' || COALESCE(s.online_order_id::text, '')) LIKE %s
           )
     """
     search_no_ref = """
@@ -590,17 +619,19 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
             LOWER(COALESCE(s.transaction_id, '')) LIKE %s
             OR LOWER(COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '')) LIKE %s
             OR LOWER(COALESCE(st.first_name, '') || ' ' || COALESCE(st.last_name, '')) LIKE %s
+            OR CAST(s.online_order_id AS TEXT) LIKE %s
+            OR LOWER('ord-' || COALESCE(s.online_order_id::text, '')) LIKE %s
           )
     """
     base_from = """
         FROM sales s
         LEFT JOIN customers c ON s.customer_id = c.customer_id
         LEFT JOIN staff_info st ON st.user_id = s.user_id
-        WHERE s.date_created::date BETWEEN %s AND %s
+        WHERE {0} BETWEEN %s AND %s
           AND s.status = 'completed'
-    """
+    """.format(_sale_date_sql("s"))
     select_sql = """
-        SELECT s.sale_id, s.transaction_id, s.date_created, s.total_amount, s.subtotal,
+        SELECT s.sale_id, s.transaction_id, s.online_order_id, s.date_created, s.total_amount, s.subtotal,
                s.discount_amount, s.tax_amount, s.cash_received, s.change_amount,
                s.payment_method, s.payment_reference, s.status,
                COALESCE(NULLIF(TRIM(CONCAT(c.first_name, ' ', c.last_name)), ''), 'Guest') AS customer_name,
@@ -610,7 +641,7 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
     query_sql = select_sql + base_from + extra_sql
     if needle:
         query_sql += search_with_ref
-        query_params.extend([like, like, like, like])
+        query_params.extend([like, like, like, like, like, like])
     query_sql += " ORDER BY s.date_created DESC LIMIT 250"
     try:
         rows = fetch_all(query_sql, tuple(query_params))
@@ -619,7 +650,7 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
         query_sql = select_sql.replace("s.payment_reference, ", "") + base_from + extra_sql
         if needle:
             query_sql += search_no_ref
-            query_params.extend([like, like, like])
+            query_params.extend([like, like, like, like, like])
         query_sql += " ORDER BY s.date_created DESC LIMIT 250"
         rows = fetch_all(query_sql, tuple(query_params))
     logs = []
@@ -638,6 +669,8 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
         logs.append({
             "sale_id": row["sale_id"],
             "transaction_id": row.get("transaction_id") or f"SALE-{row['sale_id']}",
+            "online_order_id": row.get("online_order_id"),
+            "order_no": f"ORD-{row['online_order_id']}" if row.get("online_order_id") else "",
             "date": _fmt_dt(row.get("date_created"), "%b %d, %Y"),
             "time": _fmt_dt(row.get("date_created"), "%I:%M %p"),
             "customer_name": row.get("customer_name") or "Guest",
@@ -650,11 +683,11 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
             "status": row.get("status") or "completed",
         })
     items_row = fetch_one(
-        """
+        f"""
         SELECT COALESCE(SUM(si.quantity), 0) AS items_sold
         FROM sales_items si
         JOIN sales s ON si.sale_id = s.sale_id
-        WHERE s.date_created::date BETWEEN %s AND %s
+        WHERE {_sale_date_sql("s")} BETWEEN %s AND %s
           AND s.status = 'completed'
         """,
         (start, end),
@@ -681,7 +714,7 @@ def sales_report_detail(request: Request, sale_id: int):
         return _unauthorized()
     sale = fetch_one(
         """
-        SELECT s.sale_id, s.transaction_id, s.date_created, s.total_amount, s.subtotal,
+        SELECT s.sale_id, s.transaction_id, s.online_order_id, s.date_created, s.total_amount, s.subtotal,
                s.discount_amount, s.tax_amount, s.cash_received, s.change_amount,
                s.payment_method, s.status,
                COALESCE(s.points_redeemed, 0) AS points_redeemed,
@@ -719,6 +752,8 @@ def sales_report_detail(request: Request, sale_id: int):
         "sale": {
             "sale_id": sale["sale_id"],
             "transaction_id": sale.get("transaction_id") or f"SALE-{sale['sale_id']}",
+            "online_order_id": sale.get("online_order_id"),
+            "order_no": f"ORD-{sale['online_order_id']}" if sale.get("online_order_id") else "",
             "date": _fmt_dt(sale.get("date_created"), "%b %d, %Y %I:%M %p"),
             "customer_name": sale.get("customer_name") or "Guest",
             "cashier_name": sale.get("cashier_name") or "Staff",
@@ -751,8 +786,8 @@ def sales_report_detail(request: Request, sale_id: int):
 def dashboard(request: Request, startDate: str = "", endDate: str = ""):
     if not require_staff(request):
         return _unauthorized()
-    start = startDate or datetime.now().strftime("%Y-%m-%d")
-    end = endDate or datetime.now().strftime("%Y-%m-%d")
+    start = startDate or _manila_now().strftime("%Y-%m-%d")
+    end = endDate or _manila_now().strftime("%Y-%m-%d")
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
@@ -770,20 +805,20 @@ def dashboard(request: Request, startDate: str = "", endDate: str = ""):
                 """
             )
             cur.execute(
-                "SELECT COUNT(sale_id) AS transaction_count FROM sales WHERE date_created::date BETWEEN %s AND %s AND status = 'completed'",
+                f"SELECT COUNT(sale_id) AS transaction_count FROM sales WHERE {_sale_date_sql()} BETWEEN %s AND %s AND status = 'completed'",
                 (start, end),
             )
             transaction_count = int(cur.fetchone()["transaction_count"] or 0)
             cur.execute(
-                "SELECT COALESCE(SUM(total_amount), 0) AS total_sales FROM sales WHERE date_created::date BETWEEN %s AND %s AND status = 'completed'",
+                f"SELECT COALESCE(SUM(total_amount), 0) AS total_sales FROM sales WHERE {_sale_date_sql()} BETWEEN %s AND %s AND status = 'completed'",
                 (start, end),
             )
             total_sales = float(cur.fetchone()["total_sales"] or 0)
             cur.execute(
-                """
+                f"""
                 SELECT COALESCE(SUM(si.quantity), 0) AS items_sold
                 FROM sales_items si JOIN sales s ON si.sale_id = s.sale_id
-                WHERE s.date_created::date BETWEEN %s AND %s AND s.status = 'completed'
+                WHERE {_sale_date_sql("s")} BETWEEN %s AND %s AND s.status = 'completed'
                 """,
                 (start, end),
             )
@@ -1038,7 +1073,7 @@ async def create_sale(request: Request):
                     else:
                         points_redeemed = points_requested
 
-                transaction_id = f"TXN-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(1000, 9999)}"
+                transaction_id = f"TXN-{_manila_now().strftime('%Y%m%d%H%M%S')}-{random.randint(1000, 9999)}"
                 discount_amount_with_points = discount_total + points_discount_value
                 sale_id = next_id(cur, "sales", "sale_id")
                 sale_params = (

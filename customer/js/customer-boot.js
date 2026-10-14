@@ -40,7 +40,7 @@
         }
 
         const script = document.createElement('script');
-        script.src = '/customer/js/customer.js?v=notif-new1';
+        script.src = '/customer/js/customer.js?v=txn-match1';
         document.body.appendChild(script);
     });
 
