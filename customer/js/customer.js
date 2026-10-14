@@ -30,6 +30,18 @@ onCustomerReady(function() {
     const clearCartBtn = document.getElementById('clear-cart-btn');
     const emptyCartMessage = document.getElementById('emptyCartMessage');
 
+    function txnLabel(row) {
+        const txn = String((row && row.transaction_id) || '').trim();
+        if (txn) return txn;
+        if ((row && row.kind) === 'walkin') return 'SALE-' + row.order_id;
+        return 'ORD-' + ((row && row.order_id) || '');
+    }
+
+    function orderNoLabel(row) {
+        if ((row && row.kind) === 'online' && row.order_id) return 'ORD-' + row.order_id;
+        return '';
+    }
+
     // Modals
     const receiptModal = document.getElementById('receiptModal');
     const receiptContent = document.getElementById('receiptContent');
@@ -197,8 +209,9 @@ if (target === 'orders') {
             const kind = row.kind === 'walkin' ? 'walkin' : 'online';
             const kindLabel = kind === 'walkin' ? 'Walk-in' : 'Online';
             const cls = homeStatusClass(row.order_status);
+            const ord = orderNoLabel(row);
             return `<tr>
-                <td><strong>#${row.order_id}</strong></td>
+                <td><strong>${txnLabel(row)}</strong>${ord ? `<div class="dash-item-sub">${ord}</div>` : ''}</td>
                 <td>${row.order_date || '-'}</td>
                 <td><span class="dash-kind dash-kind-${kind}">${kindLabel}</span></td>
                 <td><span class="mo-pay">${homePayLabel(row.payment_method)}</span></td>
@@ -364,6 +377,9 @@ window.loadCustomerOrders = function(type = 'all', startDate = '', endDate = '')
         if (!q) return true;
         const hay = [
             row.order_id,
+            row.transaction_id,
+            txnLabel(row),
+            orderNoLabel(row),
             row.order_date,
             row.total_amount,
             row.order_status,
@@ -411,8 +427,9 @@ window.loadCustomerOrders = function(type = 'all', startDate = '', endDate = '')
             const pendingCancel = kind === 'online' && String(row.order_status || '').toLowerCase() === 'pending'
                 ? `<button type="button" class="mo-cancel" onclick="cancelPendingOrder(${Number(row.order_id)})">Cancel</button>`
                 : '';
+            const ord = orderNoLabel(row);
             return `<tr>
-                <td><strong>#${row.order_id}</strong></td>
+                <td><strong>${txnLabel(row)}</strong>${ord ? `<div class="dash-item-sub">${ord}</div>` : ''}</td>
                 <td>${row.order_date || '-'}</td>
                 <td><span class="mo-pay">${pay}</span></td>
                 <td><span class="status ${cls}">${row.order_status || '-'}</span></td>
@@ -510,10 +527,13 @@ function displayOrderDetails(data) {
         const calculatedTotal = data.items.reduce((sum, item) => sum + (item.ordered_qty * item.price_per_unit), 0);
         const statusColor = getStatusColor(data.status);
 
+        const detailTxn = txnLabel(data);
+        const detailOrd = orderNoLabel(data);
         orderDetailsContent.innerHTML = `
             <div class="mo-detail-head">
-                <h4>Order #${data.order_id}</h4>
+                <h4>${detailTxn}</h4>
                 <p>${data.customer_name || ''}</p>
+                ${detailOrd ? `<p>Order ${detailOrd}</p>` : ''}
             </div>
             <div class="mo-detail-row"><span>Status</span><strong style="color:${statusColor};">${data.status}</strong></div>
             <table class="mo-detail-items">

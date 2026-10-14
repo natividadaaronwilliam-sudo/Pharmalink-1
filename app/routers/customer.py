@@ -103,13 +103,23 @@ def home_stats(request: Request):
     points = fetch_one("SELECT loyalty_points FROM customers WHERE customer_id = %s", (customer_id,))
     recent = fetch_all(
         """
-        SELECT order_id, order_date, order_status, total_amount, payment_method, kind FROM (
-            SELECT order_id, order_date, order_status, total_amount,
-                   COALESCE(payment_method, 'cash') AS payment_method, 'online'::text AS kind
-            FROM customer_orders WHERE customer_id = %s
+        SELECT order_id, order_date, order_status, total_amount, payment_method, kind, transaction_id FROM (
+            SELECT co.order_id, co.order_date, co.order_status, co.total_amount,
+                   COALESCE(co.payment_method, 'cash') AS payment_method, 'online'::text AS kind,
+                   s.transaction_id
+            FROM customer_orders co
+            LEFT JOIN LATERAL (
+                SELECT transaction_id
+                FROM sales
+                WHERE online_order_id = co.order_id
+                  AND LOWER(COALESCE(status, '')) = 'completed'
+                ORDER BY date_created DESC
+                LIMIT 1
+            ) s ON TRUE
+            WHERE co.customer_id = %s
             UNION ALL
             SELECT sale_id, date_created, INITCAP(status), total_amount,
-                   COALESCE(payment_method, 'cash'), 'walkin'::text
+                   COALESCE(payment_method, 'cash'), 'walkin'::text, transaction_id
             FROM sales WHERE customer_id = %s AND status = 'completed' AND online_order_id IS NULL
         ) combined
         ORDER BY order_date DESC
@@ -120,6 +130,7 @@ def home_stats(request: Request):
     transaction_logs = [
         {
             "order_id": int(r["order_id"]),
+            "transaction_id": (r.get("transaction_id") or "").strip(),
             "order_date": _fmt_dt(r["order_date"], "%b %d, %Y %I:%M %p"),
             "order_status": r["order_status"],
             "total_amount": _fmt_money(r["total_amount"]),
@@ -357,7 +368,7 @@ def list_orders(request: Request, type: str = "online", start_date: str = "", en
 
     if type in ("walkin", "all"):
         sql = """
-            SELECT sale_id AS order_id, date_created AS order_date, total_amount, status AS order_status, payment_method
+            SELECT sale_id AS order_id, transaction_id, date_created AS order_date, total_amount, status AS order_status, payment_method
             FROM sales WHERE customer_id = %s AND status = 'completed' AND online_order_id IS NULL
         """
         params = [customer_id]
@@ -368,6 +379,7 @@ def list_orders(request: Request, type: str = "online", start_date: str = "", en
         for r in fetch_all(sql, params):
             rows.append({
                 "order_id": int(r["order_id"]),
+                "transaction_id": (r.get("transaction_id") or "").strip(),
                 "order_date": _fmt_dt(r["order_date"], "%b %d, %Y %I:%M %p"),
                 "order_sort": _fmt_dt(r["order_date"], "%Y-%m-%d %H:%M:%S"),
                 "total_amount": _fmt_money(r["total_amount"]),
@@ -377,17 +389,28 @@ def list_orders(request: Request, type: str = "online", start_date: str = "", en
             })
     if type in ("online", "all"):
         sql = """
-            SELECT order_id, order_date, total_amount, order_status, payment_method, payment_status
-            FROM customer_orders WHERE customer_id = %s
+            SELECT co.order_id, co.order_date, co.total_amount, co.order_status,
+                   co.payment_method, co.payment_status, s.transaction_id
+            FROM customer_orders co
+            LEFT JOIN LATERAL (
+                SELECT transaction_id
+                FROM sales
+                WHERE online_order_id = co.order_id
+                  AND LOWER(COALESCE(status, '')) = 'completed'
+                ORDER BY date_created DESC
+                LIMIT 1
+            ) s ON TRUE
+            WHERE co.customer_id = %s
         """
         params = [customer_id]
         if start_date and end_date:
-            sql += " AND order_date::date BETWEEN %s AND %s"
+            sql += " AND co.order_date::date BETWEEN %s AND %s"
             params.extend([start_date, end_date])
-        sql += " ORDER BY order_date DESC"
+        sql += " ORDER BY co.order_date DESC"
         for r in fetch_all(sql, params):
             rows.append({
                 "order_id": int(r["order_id"]),
+                "transaction_id": (r.get("transaction_id") or "").strip(),
                 "order_date": _fmt_dt(r["order_date"], "%b %d, %Y %I:%M %p"),
                 "order_sort": _fmt_dt(r["order_date"], "%Y-%m-%d %H:%M:%S"),
                 "total_amount": _fmt_money(r["total_amount"]),
@@ -420,7 +443,7 @@ def order_details(order_id: int, request: Request, kind: str = "online"):
     if str(kind).lower() == "walkin":
         sale = fetch_one(
             """
-            SELECT sale_id, customer_id, status, payment_method, total_amount
+            SELECT sale_id, transaction_id, customer_id, status, payment_method, total_amount
             FROM sales WHERE sale_id = %s AND status = 'completed'
             """,
             (order_id,),
@@ -444,6 +467,7 @@ def order_details(order_id: int, request: Request, kind: str = "online"):
         return {
             "success": True,
             "order_id": order_id,
+            "transaction_id": (sale.get("transaction_id") or "").strip(),
             "kind": "walkin",
             "customer_name": customer_name,
             "customer_id": customer_id,
@@ -476,9 +500,20 @@ def order_details(order_id: int, request: Request, kind: str = "online"):
         """,
         (order_id,),
     )
+    sale = fetch_one(
+        """
+        SELECT transaction_id
+        FROM sales
+        WHERE online_order_id = %s AND LOWER(COALESCE(status, '')) = 'completed'
+        ORDER BY date_created DESC
+        LIMIT 1
+        """,
+        (order_id,),
+    )
     return {
         "success": True,
         "order_id": order_id,
+        "transaction_id": ((sale or {}).get("transaction_id") or "").strip(),
         "kind": "online",
         "customer_name": customer_name,
         "customer_id": header["customer_id"],

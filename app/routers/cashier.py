@@ -610,6 +610,8 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
             OR LOWER(COALESCE(s.payment_reference, '')) LIKE %s
             OR LOWER(COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '')) LIKE %s
             OR LOWER(COALESCE(st.first_name, '') || ' ' || COALESCE(st.last_name, '')) LIKE %s
+            OR CAST(s.online_order_id AS TEXT) LIKE %s
+            OR LOWER('ord-' || COALESCE(s.online_order_id::text, '')) LIKE %s
           )
     """
     search_no_ref = """
@@ -617,6 +619,8 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
             LOWER(COALESCE(s.transaction_id, '')) LIKE %s
             OR LOWER(COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '')) LIKE %s
             OR LOWER(COALESCE(st.first_name, '') || ' ' || COALESCE(st.last_name, '')) LIKE %s
+            OR CAST(s.online_order_id AS TEXT) LIKE %s
+            OR LOWER('ord-' || COALESCE(s.online_order_id::text, '')) LIKE %s
           )
     """
     base_from = """
@@ -627,7 +631,7 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
           AND s.status = 'completed'
     """.format(_sale_date_sql("s"))
     select_sql = """
-        SELECT s.sale_id, s.transaction_id, s.date_created, s.total_amount, s.subtotal,
+        SELECT s.sale_id, s.transaction_id, s.online_order_id, s.date_created, s.total_amount, s.subtotal,
                s.discount_amount, s.tax_amount, s.cash_received, s.change_amount,
                s.payment_method, s.payment_reference, s.status,
                COALESCE(NULLIF(TRIM(CONCAT(c.first_name, ' ', c.last_name)), ''), 'Guest') AS customer_name,
@@ -637,7 +641,7 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
     query_sql = select_sql + base_from + extra_sql
     if needle:
         query_sql += search_with_ref
-        query_params.extend([like, like, like, like])
+        query_params.extend([like, like, like, like, like, like])
     query_sql += " ORDER BY s.date_created DESC LIMIT 250"
     try:
         rows = fetch_all(query_sql, tuple(query_params))
@@ -646,7 +650,7 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
         query_sql = select_sql.replace("s.payment_reference, ", "") + base_from + extra_sql
         if needle:
             query_sql += search_no_ref
-            query_params.extend([like, like, like])
+            query_params.extend([like, like, like, like, like])
         query_sql += " ORDER BY s.date_created DESC LIMIT 250"
         rows = fetch_all(query_sql, tuple(query_params))
     logs = []
@@ -665,6 +669,8 @@ def sales_report(request: Request, startDate: str = "", endDate: str = "", q: st
         logs.append({
             "sale_id": row["sale_id"],
             "transaction_id": row.get("transaction_id") or f"SALE-{row['sale_id']}",
+            "online_order_id": row.get("online_order_id"),
+            "order_no": f"ORD-{row['online_order_id']}" if row.get("online_order_id") else "",
             "date": _fmt_dt(row.get("date_created"), "%b %d, %Y"),
             "time": _fmt_dt(row.get("date_created"), "%I:%M %p"),
             "customer_name": row.get("customer_name") or "Guest",
@@ -708,7 +714,7 @@ def sales_report_detail(request: Request, sale_id: int):
         return _unauthorized()
     sale = fetch_one(
         """
-        SELECT s.sale_id, s.transaction_id, s.date_created, s.total_amount, s.subtotal,
+        SELECT s.sale_id, s.transaction_id, s.online_order_id, s.date_created, s.total_amount, s.subtotal,
                s.discount_amount, s.tax_amount, s.cash_received, s.change_amount,
                s.payment_method, s.status,
                COALESCE(s.points_redeemed, 0) AS points_redeemed,
@@ -746,6 +752,8 @@ def sales_report_detail(request: Request, sale_id: int):
         "sale": {
             "sale_id": sale["sale_id"],
             "transaction_id": sale.get("transaction_id") or f"SALE-{sale['sale_id']}",
+            "online_order_id": sale.get("online_order_id"),
+            "order_no": f"ORD-{sale['online_order_id']}" if sale.get("online_order_id") else "",
             "date": _fmt_dt(sale.get("date_created"), "%b %d, %Y %I:%M %p"),
             "customer_name": sale.get("customer_name") or "Guest",
             "cashier_name": sale.get("cashier_name") or "Staff",
