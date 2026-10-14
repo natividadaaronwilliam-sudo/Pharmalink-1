@@ -8,7 +8,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, File, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from psycopg2.extras import RealDictCursor
 
 from app.activity import write_activity_log
@@ -17,6 +17,7 @@ from app.db import fetch_all, fetch_one, get_conn, next_id
 from app.deps import session_user_id
 from app.payments import CUSTOMER_EWALLET_KEYS, CUSTOMER_PAYMENT_KEYS, normalize_payment_method
 from app.paymongo import PayMongoError, create_qrph_payment, require_paid_checkout, retrieve_payment
+from app.rx_files import RX_DIR, rx_file_response, rx_file_type, rx_filename, rx_filepath
 from app.stock import allocate_expiring_first, drug_id_for_lot, match_prescription_to_stock, restore_order_stock, sellable_quantity, sync_stock_status_for_drug
 from app.profile_photos import (
     ALLOWED_EXT,
@@ -1016,9 +1017,9 @@ def prescriptions(request: Request):
                             item["availability_summary"] = []
                     elif not summary:
                         item["availability_summary"] = []
-                filename = Path(str(item.get("filename") or "")).name
-                filepath = ROOT / "uploads" / "prescriptions" / filename
-                ext = filepath.suffix.lower().lstrip(".")
+                filename = rx_filename(item.get("filename"))
+                filepath = rx_filepath(filename)
+                ext = rx_file_type(filename)
                 size = filepath.stat().st_size if filepath.is_file() else None
                 created = item.get("created_at")
                 item["created_at_label"] = _fmt_dt(created, "%b %d, %Y %I:%M %p")
@@ -1032,15 +1033,6 @@ def prescriptions(request: Request):
     return {"success": True, "prescriptions": out}
 
 
-_RX_MEDIA = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".pdf": "application/pdf",
-}
-
-
 @router.get("/prescriptions/{prescription_id}/file")
 def prescription_file(request: Request, prescription_id: int):
     customer_id = require_customer(request)
@@ -1052,17 +1044,7 @@ def prescription_file(request: Request, prescription_id: int):
     )
     if not row or not row.get("filename"):
         return JSONResponse({"success": False, "message": "Prescription not found."}, status_code=404)
-    filename = Path(str(row["filename"])).name
-    filepath = ROOT / "uploads" / "prescriptions" / filename
-    if not filepath.is_file():
-        return JSONResponse({"success": False, "message": "File is no longer available."}, status_code=404)
-    media = _RX_MEDIA.get(filepath.suffix.lower(), "application/octet-stream")
-    return FileResponse(
-        filepath,
-        media_type=media,
-        filename=filename,
-        content_disposition_type="inline",
-    )
+    return rx_file_response(row["filename"])
 
 
 def _ocr_image_for_engine(image_path: Path) -> Path:
@@ -1144,6 +1126,31 @@ def _extract_prescription_text(image_path: Path) -> str | None:
     return _run_rapidocr(image_path)
 
 
+def _pdf_page_images(pdf_path: Path, max_pages: int = 4) -> list[Path] | None:
+    """Render PDF pages to PNG so the same OCR engines can read e-prescriptions."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        return None
+    try:
+        doc = pdfium.PdfDocument(str(pdf_path))
+        page_count = len(doc)
+        if page_count <= 0:
+            return []
+        out = []
+        tmpdir = Path(tempfile.gettempdir())
+        for index in range(min(page_count, max_pages)):
+            page = doc[index]
+            bitmap = page.render(scale=2)
+            image = bitmap.to_pil().convert("RGB")
+            dest = tmpdir / f"pharmalink_rxpdf_{os.getpid()}_{pdf_path.stem}_{index}.png"
+            image.save(dest, "PNG")
+            out.append(dest)
+        return out
+    except Exception:
+        return None
+
+
 @router.post("/prescriptions")
 async def upload_prescription(request: Request, prescription_file: UploadFile = File(...)):
     customer_id = require_customer(request)
@@ -1159,7 +1166,7 @@ async def upload_prescription(request: Request, prescription_file: UploadFile = 
     if len(content) > 5 * 1024 * 1024:
         return {"success": False, "message": "File must be under 5MB."}
 
-    dest_dir = ROOT / "uploads" / "prescriptions"
+    dest_dir = RX_DIR
     dest_dir.mkdir(parents=True, exist_ok=True)
     filename = f"rx_{customer_id}_{int(time.time())}.{ext}"
     filepath = dest_dir / filename
@@ -1177,12 +1184,30 @@ async def upload_prescription(request: Request, prescription_file: UploadFile = 
             availability_summary: list = []
             ocr_status = "failed"
             if ext == "pdf":
-                ocr_status = "skipped_pdf"
+                pages = _pdf_page_images(filepath)
+                if pages is None:
+                    ocr_status = "skipped_pdf"
+                    extracted_text = None
+                else:
+                    chunks = []
+                    engine_missing = False
+                    for page in pages:
+                        text = _extract_prescription_text(page)
+                        if text is None:
+                            engine_missing = True
+                            break
+                        if text.strip():
+                            chunks.append(text.strip())
+                    if engine_missing:
+                        ocr_status = "unavailable"
+                    else:
+                        extracted_text = "\n".join(chunks)
             else:
                 extracted_text = _extract_prescription_text(filepath)
+            if ocr_status != "skipped_pdf":
                 if extracted_text is None:
                     ocr_status = "unavailable"
-                elif extracted_text.strip() == "":
+                elif str(extracted_text).strip() == "":
                     ocr_status = "failed"
                 else:
                     availability_summary = match_prescription_to_stock(cur, extracted_text)
@@ -1201,7 +1226,7 @@ async def upload_prescription(request: Request, prescription_file: UploadFile = 
 
     messages = {
         "unavailable": "Prescription uploaded, but OCR is not installed on this server.",
-        "skipped_pdf": "Prescription uploaded. PDF files are stored for pharmacist review (OCR only reads images).",
+        "skipped_pdf": "Prescription uploaded. The PDF is saved for the pharmacist; the text could not be converted for OCR on this server.",
         "failed": "Prescription uploaded, but the text could not be read clearly. A pharmacist will review it manually.",
         "completed": (
             "Prescription uploaded and read successfully."
