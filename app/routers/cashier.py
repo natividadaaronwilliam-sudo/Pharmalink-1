@@ -23,6 +23,7 @@ from app.mailer import send_mail
 from app.payments import CASHIER_PAYMENT_KEYS, CUSTOMER_EWALLET_KEYS
 from app.paymongo import PayMongoError, create_qrph_payment, retrieve_payment, require_paid_checkout
 from app.profile_photos import resolve_photo_url, staff_photo_url
+from app.rx_files import rx_file_response, rx_file_type, rx_filename, rx_filepath
 from app.stock import allocate_expiring_first, drug_id_for_lot, restore_order_stock, sellable_quantity, split_money, sync_stock_status_for_drug
 from app.validation import prepare_profile_fields
 
@@ -271,6 +272,63 @@ def promos(request: Request):
     return out
 
 
+def _staff_prescription_rows(customer_id=None, limit: int = 80) -> list[dict]:
+    params: list = []
+    where = ""
+    if customer_id is not None:
+        where = "WHERE p.user_id = %s"
+        params.append(int(customer_id))
+    params.append(int(limit))
+    rows = fetch_all(
+        f"""
+        SELECT p.id, p.user_id, p.filename, p.extracted_text, p.ocr_status, p.created_at,
+               c.first_name, c.middle_name, c.last_name
+        FROM prescriptions p
+        LEFT JOIN customers c ON c.customer_id = p.user_id
+        {where}
+        ORDER BY p.created_at DESC
+        LIMIT %s
+        """,
+        tuple(params),
+    )
+    out = []
+    for row in rows:
+        filename = rx_filename(row.get("filename"))
+        filepath = rx_filepath(filename)
+        ext = rx_file_type(filename)
+        names = [str(row.get(k) or "").strip() for k in ("first_name", "middle_name", "last_name")]
+        out.append({
+            "id": int(row["id"]),
+            "customer_id": int(row["user_id"]) if row.get("user_id") is not None else None,
+            "customer_name": " ".join(n for n in names if n) or "Customer",
+            "filename": filename,
+            "file_type": ext,
+            "file_available": filepath.is_file(),
+            "ocr_status": row.get("ocr_status") or "",
+            "extracted_text": row.get("extracted_text") or "",
+            "created_at": _fmt_dt(row.get("created_at"), "%b %d, %Y %I:%M %p"),
+            "view_url": f"/api/cashier/prescriptions/{int(row['id'])}/file",
+        })
+    return out
+
+
+@router.get("/prescriptions")
+def staff_prescriptions(request: Request):
+    if not require_staff(request):
+        return _unauthorized()
+    return {"success": True, "prescriptions": _staff_prescription_rows()}
+
+
+@router.get("/prescriptions/{prescription_id}/file")
+def staff_prescription_file(request: Request, prescription_id: int):
+    if not require_staff(request):
+        return _unauthorized()
+    row = fetch_one("SELECT filename FROM prescriptions WHERE id = %s", (prescription_id,))
+    if not row or not row.get("filename"):
+        return JSONResponse({"success": False, "message": "Prescription not found."}, status_code=404)
+    return rx_file_response(row["filename"])
+
+
 @router.get("/online-orders")
 def online_orders(request: Request):
     if not require_staff(request):
@@ -342,6 +400,7 @@ def online_order_details(order_id: int, request: Request):
         """,
         (order_id,),
     )
+    prescriptions = _staff_prescription_rows(header["customer_id"], limit=8)
     return {
         "success": True,
         "order_id": order_id,
@@ -353,6 +412,8 @@ def online_order_details(order_id: int, request: Request):
         "payment_status": header.get("payment_status") or "unpaid",
         "payment_reference": header.get("payment_reference") or "",
         "items": [dict(i) for i in items],
+        "prescriptions": prescriptions,
+        "prescription_path": prescriptions[0]["view_url"] if prescriptions else "",
     }
 
 

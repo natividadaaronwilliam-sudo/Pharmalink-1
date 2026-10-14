@@ -604,7 +604,7 @@
                         <div class="um-card-head">
                             <div>
                                 <h3>Reorder Suggestions</h3>
-                                <p>When stock hits the minimum, order enough to bring it back to 500. Select items, then create a purchase order.</p>
+                                <p>Prophet forecast for the next 30 days. Select items, then create a purchase order.</p>
                             </div>
                             <button type="button" id="createDraftPoBtn" class="action-btn" disabled>
                                 <i class="fas fa-file-invoice"></i> Create PO (<span id="draftPoSelectedCount">0</span>)
@@ -2613,7 +2613,9 @@
             let note;
             if (r.action === 'increase') {
                 actionBadge = `<span class="reorder-action-badge is-up">Order ${r.suggested_qty}</span>`;
-                note = `Hit the minimum of ${r.minimum_stock}. Order up to 500.`;
+                note = r.forecast_units != null
+                    ? `Forecast ${r.forecast_units} in 30 days.`
+                    : 'Based on recent sales.';
             } else if (r.action === 'decrease') {
                 actionBadge = `<span class="reorder-action-badge is-down">Pause</span>`;
                 note = r.days_of_stock != null ? `${r.days_of_stock} days of stock.` : 'More than enough stock.';
