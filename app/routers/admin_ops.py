@@ -82,6 +82,7 @@ def list_promos(request: Request):
             status = "Active"
         item["status"] = status
         item["products"] = []
+        item["drug_ids"] = []
         out.append(item)
         promo_ids.append(int(item["promo_id"]))
     if promo_ids:
@@ -94,12 +95,16 @@ def list_promos(request: Request):
             (promo_ids,),
         )
         by_promo = {}
+        by_ids = {}
         for link in links:
+            pid = int(link["promo_id"])
             label = f"{link['generic_name']}" + (f" ({link['brand_name']})" if link.get("brand_name") else "")
-            by_promo.setdefault(int(link["promo_id"]), []).append(label.strip())
+            by_promo.setdefault(pid, []).append(label.strip())
+            by_ids.setdefault(pid, []).append(int(link["drug_id"]))
         for item in out:
             names = by_promo.get(int(item["promo_id"]), [])
             item["products"] = names
+            item["drug_ids"] = by_ids.get(int(item["promo_id"]), [])
             if names:
                 item["scope"] = ", ".join(names) if len(names) <= 2 else f"{names[0]}, {names[1]} +{len(names) - 2} more"
             elif item.get("drug_id"):
@@ -110,14 +115,13 @@ def list_promos(request: Request):
                 item["scope"] = f"Segment: {item['segment_label']}"
             else:
                 item["scope"] = item.get("category") or "Storewide"
+    else:
+        for item in out:
+            item["drug_ids"] = []
     return out
 
 
-@router.post("/promos")
-async def add_promo(request: Request):
-    if not require_admin(request):
-        return _unauthorized()
-    data = await request.json()
+def _parse_promo_body(data, *, require_future_dates):
     name = str(data.get("name") or "").strip()
     discount_type = "fixed" if data.get("discount_type") == "fixed" else "percent"
     discount_value = float(data["discount_value"]) if data.get("discount_value") is not None else None
@@ -129,33 +133,63 @@ async def add_promo(request: Request):
     if scope == "segment":
         segment_label = str(data.get("segment_label") or "").strip()
         if not segment_label:
-            return {"success": False, "message": "Please select a customer segment."}
+            return None, {"success": False, "message": "Please select a customer segment."}
     elif scope == "category":
         category = str(data.get("category") or "").strip()
         if not category:
-            return {"success": False, "message": "Please select a category."}
+            return None, {"success": False, "message": "Please select a category."}
     elif scope == "drug":
         drug_id = int(data.get("drug_id") or 0)
         if not drug_id:
-            return {"success": False, "message": "Please select a drug."}
+            return None, {"success": False, "message": "Please select a drug."}
     elif scope == "drugs":
         drug_ids = [int(x) for x in (data.get("drug_ids") or []) if int(x) > 0]
         drug_ids = list(dict.fromkeys(drug_ids))
         if not drug_ids:
-            return {"success": False, "message": "Please select at least one product."}
+            return None, {"success": False, "message": "Please select at least one product."}
     if not name or discount_value is None or discount_value <= 0 or not start_date or not end_date:
-        return {"success": False, "message": "Name, a positive discount value, and both dates are required."}
+        return None, {"success": False, "message": "Name, a positive discount value, and both dates are required."}
     start = _parse_iso_date(start_date)
     end = _parse_iso_date(end_date)
     if not start or not end:
-        return {"success": False, "message": "Start and end dates are invalid."}
-    today = _manila_today()
-    if start < today or end < today:
-        return {"success": False, "message": "Promo dates cannot be in the past."}
+        return None, {"success": False, "message": "Start and end dates are invalid."}
+    if require_future_dates:
+        today = _manila_today()
+        if start < today or end < today:
+            return None, {"success": False, "message": "Promo dates cannot be in the past."}
     if end < start:
-        return {"success": False, "message": "End date cannot be before the start date."}
+        return None, {"success": False, "message": "End date cannot be before the start date."}
     if discount_type == "percent" and discount_value > 100:
-        return {"success": False, "message": "A percent discount cannot exceed 100%."}
+        return None, {"success": False, "message": "A percent discount cannot exceed 100%."}
+    return {
+        "name": name,
+        "discount_type": discount_type,
+        "discount_value": discount_value,
+        "scope": scope,
+        "start_date": start_date,
+        "end_date": end_date,
+        "category": category,
+        "drug_id": drug_id,
+        "segment_label": segment_label,
+        "drug_ids": drug_ids,
+    }, None
+
+
+def _promo_scope_note(fields):
+    if fields["scope"] == "segment":
+        return f" for the {fields['segment_label']} segment"
+    if fields["scope"] == "drugs":
+        return f" on {len(fields['drug_ids'])} products"
+    return ""
+
+
+@router.post("/promos")
+async def add_promo(request: Request):
+    if not require_admin(request):
+        return _unauthorized()
+    fields, err = _parse_promo_body(await request.json(), require_future_dates=True)
+    if err:
+        return err
     admin_name = request.session.get("user_first_name") or "Admin"
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -165,19 +199,84 @@ async def add_promo(request: Request):
                 INSERT INTO promos (promo_id, name, discount_type, discount_value, drug_id, category, segment_label, start_date, end_date, is_active, created_by)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 1, %s)
                 """,
-                (promo_id, name, discount_type, discount_value, drug_id, category, segment_label, start_date, end_date, admin_name),
+                (
+                    promo_id,
+                    fields["name"],
+                    fields["discount_type"],
+                    fields["discount_value"],
+                    fields["drug_id"],
+                    fields["category"],
+                    fields["segment_label"],
+                    fields["start_date"],
+                    fields["end_date"],
+                    admin_name,
+                ),
             )
-            if scope == "drugs":
-                for did in drug_ids:
+            if fields["scope"] == "drugs":
+                for did in fields["drug_ids"]:
                     cur.execute("INSERT INTO promo_drugs (promo_id, drug_id) VALUES (%s, %s)", (promo_id, did))
-            if scope == "segment":
-                note = f" for the {segment_label} segment"
-            elif scope == "drugs":
-                note = f" on {len(drug_ids)} products"
-            else:
-                note = ""
-            amount = f"{discount_value:g}% off" if discount_type == "percent" else f"₱{discount_value:g} off"
-            _log(cur, request, "Create Promo", f"Created promo {name}: {amount}, {start_date} to {end_date}{note}.")
+            amount = (
+                f"{fields['discount_value']:g}% off"
+                if fields["discount_type"] == "percent"
+                else f"₱{fields['discount_value']:g} off"
+            )
+            _log(
+                cur,
+                request,
+                "Create Promo",
+                f"Created promo {fields['name']}: {amount}, {fields['start_date']} to {fields['end_date']}{_promo_scope_note(fields)}.",
+            )
+    return {"success": True, "promo_id": promo_id}
+
+
+@router.put("/promos/{promo_id}")
+async def update_promo(request: Request, promo_id: int):
+    if not require_admin(request):
+        return _unauthorized()
+    if promo_id <= 0:
+        return {"success": False, "message": "Promo ID is required."}
+    existing = fetch_one("SELECT promo_id FROM promos WHERE promo_id = %s", (promo_id,))
+    if not existing:
+        return {"success": False, "message": "Promo not found."}
+    fields, err = _parse_promo_body(await request.json(), require_future_dates=False)
+    if err:
+        return err
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                UPDATE promos
+                SET name = %s, discount_type = %s, discount_value = %s, drug_id = %s,
+                    category = %s, segment_label = %s, start_date = %s, end_date = %s
+                WHERE promo_id = %s
+                """,
+                (
+                    fields["name"],
+                    fields["discount_type"],
+                    fields["discount_value"],
+                    fields["drug_id"],
+                    fields["category"],
+                    fields["segment_label"],
+                    fields["start_date"],
+                    fields["end_date"],
+                    promo_id,
+                ),
+            )
+            cur.execute("DELETE FROM promo_drugs WHERE promo_id = %s", (promo_id,))
+            if fields["scope"] == "drugs":
+                for did in fields["drug_ids"]:
+                    cur.execute("INSERT INTO promo_drugs (promo_id, drug_id) VALUES (%s, %s)", (promo_id, did))
+            amount = (
+                f"{fields['discount_value']:g}% off"
+                if fields["discount_type"] == "percent"
+                else f"₱{fields['discount_value']:g} off"
+            )
+            _log(
+                cur,
+                request,
+                "Update Promo",
+                f"Updated promo {fields['name']}: {amount}, {fields['start_date']} to {fields['end_date']}{_promo_scope_note(fields)}.",
+            )
     return {"success": True, "promo_id": promo_id}
 
 
