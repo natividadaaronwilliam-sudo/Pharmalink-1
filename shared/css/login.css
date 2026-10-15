@@ -50,9 +50,18 @@ body {
 .login-branding h1 {
   font-size: 40px;
   font-weight: 700;
-  margin: 0 0 16px;
+  margin: 0 0 6px;
   position: relative;
   color: #FFF7E6;
+}
+.login-branding .brand-subtitle {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: #FFE3B3;
+  margin: 0 0 28px;
+  position: relative;
 }
 .login-branding > p {
   font-size: 16px;

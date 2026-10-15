@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PharmaLink System - Cashier/Pharmacist Dashboard</title>
     <link rel="stylesheet" href="/assets/theme.css?v=notif-new1">
-    <link rel="stylesheet" href="/cashier/css/cashier.css?v=rx-staff1">
+    <link rel="stylesheet" href="/cashier/css/cashier.css?v=no-rx1">
     <link rel="stylesheet" href="/shared/css/segmentation.css?v=palette-w4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -28,9 +28,6 @@
     </div>
     <div class="nav-item" data-page="pos-page">
       <i class="fas fa-cash-register"></i><span>Point of Sale</span>
-    </div>
-    <div class="nav-item" data-page="prescriptions-page">
-      <i class="fas fa-file-prescription"></i><span>Prescriptions</span>
     </div>
     <div class="nav-item" data-page="sales-report-page">
       <i class="fas fa-file-invoice-dollar"></i><span>Sales Report</span>
@@ -465,41 +462,6 @@
 </div>
 
 
-<div id="prescriptions-page" class="page">
-    <div class="dashboard-header">
-        <h2>Prescriptions</h2>
-        <p class="subtitle">Uploaded Rx files from customers, including PDF e-prescriptions.</p>
-    </div>
-    <div class="table-card">
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Customer</th>
-                        <th>File</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="staffRxBody">
-                    <tr><td colspan="5" class="cs-empty">Loading prescriptions...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-<div id="staffRxViewOverlay" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width:860px;">
-        <div class="modal-header">
-            <h2 id="staffRxViewTitle">Prescription</h2>
-            <span class="close" id="closeStaffRxView">&times;</span>
-        </div>
-        <p id="staffRxViewMeta" style="margin:0 0 12px;color:#4b5563;"></p>
-        <div id="staffRxViewMedia" class="staff-rx-media"></div>
-        <pre id="staffRxViewText" class="staff-rx-text" hidden></pre>
-    </div>
-</div>
 <div id="sales-report-page" class="page">
     <div class="dashboard-header">
         <h2>Sales Report &amp; Transaction Logs</h2>
@@ -719,11 +681,6 @@
             <tbody id="reviewItemsBody">
                 </tbody>
         </table>
-
-        <div id="prescriptionContainer" style="margin-top: 20px; border: 1px dashed #ccc; padding: 10px; display:none;">
-            <h4>Customer prescriptions</h4>
-            <div id="reviewPrescriptionList"></div>
-        </div>
 
         <hr>
 
@@ -1962,11 +1919,7 @@ if (availablePointsSpan) availablePointsSpan.textContent = selectedCustomer.loya
         });
 }
 /**
- * [CONCEPTUAL] Opens a modal/screen to review a pending order (e.g., check prescription).
- * @param {string} orderId 
- */
-/**
- * Opens a modal/screen to review a pending order (e.g., check prescription).
+ * Opens a modal/screen to review a pending order.
  * @param {string} orderId - Ang ID ng online order.
  */
 window.reviewOrder = function(orderId) {
@@ -1997,31 +1950,6 @@ window.reviewOrder = function(orderId) {
             document.getElementById('reviewOrderStatus').textContent = data.status;
             const reviewPay = document.getElementById('reviewPayment');
             if (reviewPay) reviewPay.textContent = onlinePayLabel(data);
-            
-            const prescContainer = document.getElementById('prescriptionContainer');
-            const prescList = document.getElementById('reviewPrescriptionList');
-            const rxFiles = Array.isArray(data.prescriptions) ? data.prescriptions : [];
-            if (rxFiles.length && prescList) {
-                prescList.innerHTML = rxFiles.map((p) => {
-                    const label = (p.file_type || 'file').toUpperCase();
-                    const when = p.created_at || '';
-                    const canOpen = p.file_available && p.view_url;
-                    return `<p style="margin:6px 0;"><strong>${label}</strong> · ${when}
-                        ${canOpen ? `<button type="button" class="btn review-rx-btn" data-rx-url="${p.view_url}" data-rx-type="${label}" data-rx-meta="${when}">View</button>` : '<span>File missing</span>'}
-                    </p>`;
-                }).join('');
-                prescList.querySelectorAll('.review-rx-btn').forEach((btn) => {
-                    btn.addEventListener('click', () => openStaffRxView({
-                        view_url: btn.getAttribute('data-rx-url'),
-                        file_type: btn.getAttribute('data-rx-type'),
-                        created_at: btn.getAttribute('data-rx-meta'),
-                        customer_name: data.customer_name || ''
-                    }));
-                });
-                prescContainer.style.display = 'block';
-            } else if (prescContainer) {
-                prescContainer.style.display = 'none';
-            }
 
             itemsBody.innerHTML = '';
             let isReadyToProcess = true;
@@ -2165,81 +2093,6 @@ loadInventory();
 
 });
 
-function staffRxStatusLabel(status) {
-    const key = String(status || '').toLowerCase();
-    if (key === 'completed') return 'Read';
-    if (key === 'skipped_pdf') return 'PDF stored';
-    if (key === 'unavailable') return 'OCR not installed';
-    if (key === 'failed') return 'Could not read';
-    if (key === 'pending') return 'Processing';
-    return status || 'Uploaded';
-}
-
-function openStaffRxView(p) {
-    const overlay = document.getElementById('staffRxViewOverlay');
-    const title = document.getElementById('staffRxViewTitle');
-    const meta = document.getElementById('staffRxViewMeta');
-    const media = document.getElementById('staffRxViewMedia');
-    const textEl = document.getElementById('staffRxViewText');
-    if (!overlay || !media) return;
-    if (title) title.textContent = p.customer_name ? ('Rx · ' + p.customer_name) : 'Prescription';
-    if (meta) meta.textContent = [p.created_at, (p.file_type || '').toUpperCase()].filter(Boolean).join(' · ');
-    const type = String(p.file_type || '').toLowerCase();
-    if (!p.file_available && !p.view_url) {
-        media.innerHTML = '<p>That file is no longer available.</p>';
-    } else if (type === 'pdf') {
-        media.innerHTML = `<iframe title="Prescription PDF" src="${p.view_url}" style="width:100%;min-height:70vh;border:0;"></iframe>`;
-    } else {
-        media.innerHTML = `<img src="${p.view_url}" alt="Prescription" style="max-width:100%;height:auto;">`;
-    }
-    if (textEl) {
-        const extracted = String(p.extracted_text || '').trim();
-        textEl.hidden = !extracted;
-        textEl.textContent = extracted;
-    }
-    overlay.style.display = 'flex';
-}
-
-function loadStaffPrescriptions() {
-    const body = document.getElementById('staffRxBody');
-    if (!body) return;
-    fetch('/api/cashier/prescriptions', { credentials: 'same-origin' })
-        .then((res) => res.json())
-        .then((data) => {
-            const rows = (data && data.success && Array.isArray(data.prescriptions)) ? data.prescriptions : [];
-            if (!rows.length) {
-                body.innerHTML = '<tr><td colspan="5" class="cs-empty">No prescription uploads yet.</td></tr>';
-                return;
-            }
-            body.innerHTML = rows.map((p) => {
-                const canView = p.file_available ? '' : 'disabled';
-                return `<tr>
-                    <td>${p.created_at || ''}</td>
-                    <td>${p.customer_name || 'Customer'}</td>
-                    <td>${(p.file_type || '').toUpperCase()}</td>
-                    <td>${staffRxStatusLabel(p.ocr_status)}</td>
-                    <td><button type="button" class="btn staff-rx-open" data-rx-id="${p.id}" ${canView}>View</button></td>
-                </tr>`;
-            }).join('');
-            const byId = {};
-            rows.forEach((p) => { byId[String(p.id)] = p; });
-            body.querySelectorAll('.staff-rx-open').forEach((btn) => {
-                btn.addEventListener('click', () => openStaffRxView(byId[btn.getAttribute('data-rx-id')] || {}));
-            });
-        })
-        .catch(() => {
-            body.innerHTML = '<tr><td colspan="5" class="cs-empty">Could not load prescriptions.</td></tr>';
-        });
-}
-
-document.getElementById('closeStaffRxView')?.addEventListener('click', () => {
-    const overlay = document.getElementById('staffRxViewOverlay');
-    if (overlay) overlay.style.display = 'none';
-});
-document.getElementById('staffRxViewOverlay')?.addEventListener('click', (e) => {
-    if (e.target && e.target.id === 'staffRxViewOverlay') e.target.style.display = 'none';
-});
-
 document.querySelectorAll('.nav-item').forEach(nav => {
     nav.addEventListener('click', function () {
         let target = this.dataset.page;
@@ -2249,9 +2102,6 @@ if (target === "pos-page") {
     console.log("POS page activated → Loading categories & POS inventory...");
     loadCategories();
     loadPOSInventory();
-        }
-        if (target === "prescriptions-page") {
-            loadStaffPrescriptions();
         }
     });
 });
@@ -3372,6 +3222,12 @@ function srEsc(s) {
     }[c]));
 }
 
+function shortTxnId(value) {
+    const s = String(value || '').trim();
+    const parts = /^TXN-\d+-(\d+)$/i.exec(s);
+    return parts ? ('TXN-' + parts[1]) : s;
+}
+
 function srPayLabel(method) {
     const m = String(method || 'cash').toLowerCase();
     if (m === 'gcash') return 'GCash';
@@ -3412,7 +3268,7 @@ function loadSalesReport() {
             body.innerHTML = logs.map((t) => {
                 const pay = String(t.payment_method || 'cash').toLowerCase();
                 return '<tr>' +
-                    '<td>' + srEsc(t.transaction_id) + (t.order_no ? '<div style="font-size:0.8em;color:#64748b;">' + srEsc(t.order_no) + '</div>' : '') + '</td>' +
+                    '<td title="' + srEsc(t.transaction_id) + '">' + srEsc(shortTxnId(t.transaction_id)) + (t.order_no ? '<div style="font-size:0.8em;color:#64748b;">' + srEsc(t.order_no) + '</div>' : '') + '</td>' +
                     '<td>' + srEsc(t.date) + '</td>' +
                     '<td>' + srEsc(t.time) + '</td>' +
                     '<td>' + srEsc(t.customer_name) + '</td>' +
@@ -3527,7 +3383,10 @@ function openSalesReportDetail(saleId) {
             const s = data.sale;
             srLoadedDetail = { sale: s, items: data.items || [] };
             if (reprintBtn) reprintBtn.disabled = false;
-            if (title) title.textContent = s.transaction_id;
+            if (title) {
+                title.textContent = shortTxnId(s.transaction_id);
+                title.title = s.transaction_id || '';
+            }
             const itemRows = (data.items || []).map((it) =>
                 '<tr><td>' + srEsc(it.name) + (it.promo_name ? ' <small>' + srEsc(it.promo_name) + '</small>' : '') +
                 '</td><td>' + it.quantity + '</td><td>₱' + Number(it.price).toFixed(2) +
