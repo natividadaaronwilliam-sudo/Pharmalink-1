@@ -1151,8 +1151,35 @@ window.clearCart = function() {
  * @param {object} saleData - Data ng bentahan (para sa items, totals).
  * @param {Window} printWindow - Ang pre-opened window object.
  */
+function storeReceiptCss() {
+    return `
+        body { font-family: 'Courier New', Courier, monospace; font-size: 11px; margin: 0; padding: 10px; }
+        .receipt { width: 300px; margin: 0 auto; }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        th, td { padding: 2px 0; }
+        .border-top { border-top: 1px dashed #000; }
+        .border-bottom { border-bottom: 1px dashed #000; }
+        .addr { margin: 4px 0 0; font-size: 10px; }
+        @media print { .no-print { display: none; } }
+    `;
+}
+
+function storeReceiptHeaderHtml() {
+    return '<div class="center"><h4>PMDS Drugstore</h4>' +
+        '<p class="addr">29 Alcalde Jose, Kapasigan, Pasig, 1600 Metro Manila</p></div>';
+}
+
+function shortTxnId(value) {
+    const s = String(value || '').trim();
+    const parts = /^TXN-\d+-(\d+)$/i.exec(s);
+    return parts ? ('TXN-' + parts[1]) : s;
+}
+
 function printReceipt(responseData, saleData, printWindow) {
     const transactionId = responseData.transaction_id || 'N/A';
+    const txnDisplay = shortTxnId(transactionId);
     const date = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
     
     // ⭐ FIX #1: GUMAMIT NG TAMANG LOGIC PARA SA CUSTOMER DISPLAY ⭐
@@ -1206,31 +1233,15 @@ function printReceipt(responseData, saleData, printWindow) {
         <html>
         <head>
             <title>Receipt ${transactionId}</title>
-            <style>
-                body { font-family: 'Courier New', Courier, monospace; font-size: 11px; margin: 0; padding: 10px; }
-                .receipt { width: 280px; margin: 0 auto; }
-                .center { text-align: center; }
-                .right { text-align: right; }
-                table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-                th, td { padding: 2px 0; }
-                .border-top { border-top: 1px dashed #000; }
-                .border-bottom { border-bottom: 1px dashed #000; }
-                @media print { 
-                    .no-print { display: none; } 
-                }
-            </style>
+            <style>${storeReceiptCss()}</style>
         </head>
         <body>
             <div class="receipt">
-                <div class="center">
-                    <h4>PMDS Drugstore</h4>
-                    <p>123 PLP St, Kapasigan, Pasig City<br>
-                    TIN: 000-000-000-000</p>
-                </div>
+                ${storeReceiptHeaderHtml()}
                 <div class="border-top"></div>
                 <p>Date: ${date}</p>
-                <p>Trans ID: ${transactionId}</p>
-                <p>${customerDisplay}</p> <!-- ⭐ FIX #2: GINAMIT NA ANG customerDisplay ⭐ -->
+                <p>Trans ID: ${txnDisplay}</p>
+                <p>${customerDisplay}</p>
                 <div class="border-bottom"></div>
                 <table>
                     <thead>
@@ -1257,12 +1268,10 @@ function printReceipt(responseData, saleData, printWindow) {
                     ${paymentLineHtml}
                 </table>
                 <div class="border-bottom"></div>
-                
                 <div class="center no-print" style="margin-top: 20px;">
                     <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer;"><i class="fas fa-print"></i> Print Receipt</button>
                     <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer;"><i class="fas fa-xmark"></i> Close</button>
                 </div>
-
                 <div class="center" style="margin-top: 10px;"><p>Thank you! Come again.</p></div>
             </div>
         </body>
@@ -3222,12 +3231,6 @@ function srEsc(s) {
     }[c]));
 }
 
-function shortTxnId(value) {
-    const s = String(value || '').trim();
-    const parts = /^TXN-\d+-(\d+)$/i.exec(s);
-    return parts ? ('TXN-' + parts[1]) : s;
-}
-
 function srPayLabel(method) {
     const m = String(method || 'cash').toLowerCase();
     if (m === 'gcash') return 'GCash';
@@ -3332,15 +3335,11 @@ function reprintSalesReceipt(sale, items) {
         ? 'Customer: ' + sale.customer_name
         : 'Customer: Guest';
     const receiptHtml = '<html><head><title>Receipt ' + srEsc(sale.transaction_id || '') + '</title>' +
-        '<style>body{font-family:Courier New,Courier,monospace;font-size:11px;margin:0;padding:10px;}' +
-        '.receipt{width:280px;margin:0 auto;}.center{text-align:center;}.right{text-align:right;}' +
-        'table{width:100%;border-collapse:collapse;margin-top:5px;}th,td{padding:2px 0;}' +
-        '.border-top{border-top:1px dashed #000;}.border-bottom{border-bottom:1px dashed #000;}' +
-        '@media print{.no-print{display:none;}}</style></head><body><div class="receipt">' +
-        '<div class="center"><h4>PMDS Drugstore</h4><p>123 PLP St, Kapasigan, Pasig City<br>TIN: 000-000-000-000</p></div>' +
+        '<style>' + storeReceiptCss() + '</style></head><body><div class="receipt">' +
+        storeReceiptHeaderHtml() +
         '<div class="border-top"></div>' +
         '<p>Date: ' + srEsc(sale.date || '') + '</p>' +
-        '<p>Trans ID: ' + srEsc(sale.transaction_id || '') + '</p>' +
+        '<p>Trans ID: ' + srEsc(shortTxnId(sale.transaction_id || '')) + '</p>' +
         (sale.order_no ? '<p>Order: ' + srEsc(sale.order_no) + '</p>' : '') +
         '<p>' + srEsc(customer) + '</p>' +
         '<div class="border-bottom"></div>' +

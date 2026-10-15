@@ -1475,6 +1475,12 @@
                 </div>
                 <button type="button" id="addPromoBtn" class="add-btn" style="background:#4BAA8B;"><i class="fas fa-plus"></i> Create Promo</button>
             </div>
+            <div class="promo-filter-row" style="display:flex;gap:8px;flex-wrap:wrap;padding:0 4px 12px;">
+                <button type="button" class="promo-filter-btn active" data-promo-filter="current" style="padding:6px 14px;border:1px solid #4BAA8B;border-radius:20px;background:#4BAA8B;color:#fff;cursor:pointer;font-size:13px;">Current</button>
+                <button type="button" class="promo-filter-btn" data-promo-filter="Expired" style="padding:6px 14px;border:1px solid #6b7280;border-radius:20px;background:#fff;color:#6b7280;cursor:pointer;font-size:13px;">Expired</button>
+                <button type="button" class="promo-filter-btn" data-promo-filter="Disabled" style="padding:6px 14px;border:1px solid #dc2626;border-radius:20px;background:#fff;color:#dc2626;cursor:pointer;font-size:13px;">Disabled</button>
+                <button type="button" class="promo-filter-btn" data-promo-filter="all" style="padding:6px 14px;border:1px solid #1E3A34;border-radius:20px;background:#fff;color:#1E3A34;cursor:pointer;font-size:13px;">All</button>
+            </div>
             <div class="table-wrap">
                 <table id="promosTable">
                     <thead>
@@ -2741,6 +2747,9 @@
     // ==========================================================
     let promosDrugList = [];
     let promosLoaded = false;
+    let allPromoRows = [];
+    let promoStatusFilter = 'current';
+    let editingPromoId = null;
 
     function updateLoyaltyPreview() {
         const input = document.getElementById('loyalty_peso_per_point');
@@ -2856,9 +2865,12 @@
     }
 
     function loadPromos() {
-        fetch('/api/admin/promos')
+        fetch('/api/admin/promos', { credentials: 'same-origin' })
             .then(res => res.json())
-            .then(rows => renderPromosTable(rows || []))
+            .then(rows => {
+                allPromoRows = Array.isArray(rows) ? rows : [];
+                renderPromosTable();
+            })
             .catch(err => {
                 console.error('Promos error:', err);
                 const body = document.getElementById('promosBody');
@@ -2867,11 +2879,36 @@
     }
     window.loadPromos = loadPromos;
 
-    function renderPromosTable(rows) {
+    function promoMatchesFilter(p) {
+        if (promoStatusFilter === 'all') return true;
+        if (promoStatusFilter === 'current') return p.status === 'Active' || p.status === 'Scheduled';
+        return p.status === promoStatusFilter;
+    }
+
+    function paintPromoFilterButtons() {
+        document.querySelectorAll('.promo-filter-btn').forEach((btn) => {
+            const on = btn.getAttribute('data-promo-filter') === promoStatusFilter;
+            btn.classList.toggle('active', on);
+            if (on) {
+                btn.style.background = btn.style.borderColor || '#4BAA8B';
+                btn.style.color = '#fff';
+            } else {
+                btn.style.background = '#fff';
+                btn.style.color = btn.style.borderColor || '#6b7280';
+            }
+        });
+    }
+
+    function renderPromosTable() {
         const body = document.getElementById('promosBody');
         if (!body) return;
-        if (!rows.length) {
+        const rows = allPromoRows.filter(promoMatchesFilter);
+        if (!allPromoRows.length) {
             body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:15px;">No promos yet. Click "Create Promo" to add one.</td></tr>';
+            return;
+        }
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:15px;">No promos in this filter.</td></tr>';
             return;
         }
         const statusColor = { Active: '#4BAA8B', Scheduled: '#4BAA8B', Expired: '#6b7280', Disabled: '#dc2626' };
@@ -2885,16 +2922,28 @@
                 <td>${escapeHtmlPromo(p.scope)}</td>
                 <td>${p.start_date} - ${p.end_date}</td>
                 <td><span style="background:${color}20;color:${color};padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">${p.status}</span></td>
-                <td><button type="button" class="toggle-promo-btn" data-id="${p.promo_id}" style="background:${p.is_active ? '#dc2626' : '#4BAA8B'};color:#fff;border:none;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:12px;">${p.is_active ? 'Disable' : 'Enable'}</button></td>
+                <td style="white-space:nowrap;">
+                    <button type="button" class="edit-promo-btn" data-id="${p.promo_id}" style="background:#FFC857;color:#1E3A34;border:none;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:12px;margin-right:6px;"><i class="fas fa-pen"></i> Edit</button>
+                    <button type="button" class="toggle-promo-btn" data-id="${p.promo_id}" style="background:${p.is_active ? '#dc2626' : '#4BAA8B'};color:#fff;border:none;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:12px;">${p.is_active ? 'Disable' : 'Enable'}</button>
+                </td>
             </tr>`;
         }).join('');
     }
 
     document.getElementById('promosBody')?.addEventListener('click', e => {
+        const editBtn = e.target.closest('.edit-promo-btn');
+        if (editBtn) {
+            const promo = allPromoRows.find((p) => String(p.promo_id) === String(editBtn.dataset.id));
+            if (promo) window.openPromoModal(promo);
+            return;
+        }
         const btn = e.target.closest('.toggle-promo-btn');
         if (!btn) return;
         fetch('/api/admin/promos/toggle', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ promo_id: btn.dataset.id })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ promo_id: btn.dataset.id })
         })
             .then(res => res.json())
             .then(result => { if (result.success) loadPromos(); else alert(result.message || 'Failed to update promo.'); })
@@ -2902,9 +2951,7 @@
     });
 
     function populatePromoCategoryAndDrugSelects() {
-        // Reuse whatever drug master list the Inventory module already
-        // fetched, if available, instead of hitting the DB again.
-        fetch('/api/admin/drugs')
+        return fetch('/api/admin/drugs', { credentials: 'same-origin' })
             .then(res => res.json())
             .then(drugs => {
                 promosDrugList = Array.isArray(drugs) ? drugs.filter(d => Number(d.is_active) === 1) : [];
@@ -2921,11 +2968,41 @@
             .catch(err => console.error('Failed to load drugs for promo form:', err));
     }
 
+    function applyPromoScopeFields(scope) {
+        const sel = document.getElementById('promo_scope');
+        if (sel) sel.value = scope;
+        const segmentField = document.getElementById('promo_segment_field');
+        const categoryField = document.getElementById('promo_category_field');
+        const drugField = document.getElementById('promo_drug_field');
+        const drugsField = document.getElementById('promo_drugs_field');
+        if (segmentField) segmentField.style.display = scope === 'segment' ? 'block' : 'none';
+        if (categoryField) categoryField.style.display = scope === 'category' ? 'block' : 'none';
+        if (drugField) drugField.style.display = scope === 'drug' ? 'block' : 'none';
+        if (drugsField) drugsField.style.display = scope === 'drugs' ? 'block' : 'none';
+    }
+
+    function promoScopeOf(p) {
+        if ((p.drug_ids || []).length) return 'drugs';
+        if (p.drug_id) return 'drug';
+        if (p.segment_label) return 'segment';
+        if (p.category) return 'category';
+        return 'all';
+    }
+
+    function setPromoModalMode(isEdit) {
+        const title = document.getElementById('promoModalTitle');
+        const label = document.getElementById('submitPromoBtnLabel');
+        if (title) title.innerHTML = isEdit
+            ? '<i class="fas fa-pen"></i> Edit Promo'
+            : '<i class="fas fa-tags"></i> Create Promo';
+        if (label) label.textContent = isEdit ? 'Save changes' : 'Create Promo';
+    }
+
     function populatePromoSegmentSelect() {
         const sel = document.getElementById('promo_segment');
-        if (!sel) return;
+        if (!sel) return Promise.resolve();
         sel.innerHTML = '<option value="">Loading segments...</option>';
-        fetch('/api/cashier/segmentation', { credentials: 'same-origin' })
+        return fetch('/api/cashier/segmentation', { credentials: 'same-origin' })
             .then(res => res.json())
             .then(data => {
                 const k = String(data.active_k || 3);
@@ -3026,11 +3103,15 @@
         document.querySelectorAll('#inv-panel-reorder [data-reorder-filter]').forEach(card => {
             card.addEventListener('click', () => applyReorderFilter(card.getAttribute('data-reorder-filter')));
         });
+        document.querySelectorAll('.promo-filter-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                promoStatusFilter = btn.getAttribute('data-promo-filter') || 'current';
+                paintPromoFilterButtons();
+                renderPromosTable();
+            });
+        });
         document.getElementById('promo_scope')?.addEventListener('change', function () {
-            document.getElementById('promo_segment_field').style.display = this.value === 'segment' ? 'block' : 'none';
-            document.getElementById('promo_category_field').style.display = this.value === 'category' ? 'block' : 'none';
-            document.getElementById('promo_drug_field').style.display = this.value === 'drug' ? 'block' : 'none';
-            document.getElementById('promo_drugs_field').style.display = this.value === 'drugs' ? 'block' : 'none';
+            applyPromoScopeFields(this.value);
         });
 
         document.getElementById('promo_drugs_search')?.addEventListener('input', function () {
@@ -3043,23 +3124,71 @@
             renderPromoDrugsChecklist(filtered);
         });
 
-        document.getElementById('addPromoBtn')?.addEventListener('click', () => {
-            populatePromoCategoryAndDrugSelects();
+        window.openPromoModal = function openPromoModal(promo) {
+            const isEdit = !!(promo && promo.promo_id);
+            editingPromoId = isEdit ? promo.promo_id : null;
+            setPromoModalMode(isEdit);
             document.getElementById('addPromoForm')?.reset();
-            populatePromoSegmentSelect();
-            document.getElementById('promo_segment_field').style.display = 'none';
-            document.getElementById('promo_category_field').style.display = 'none';
-            document.getElementById('promo_drug_field').style.display = 'none';
-            document.getElementById('promo_drugs_field').style.display = 'none';
             promoSelectedDrugIds = new Set();
-            updatePromoDrugsCount();
             const searchBox = document.getElementById('promo_drugs_search');
             if (searchBox) searchBox.value = '';
-            lockDateNoPast(document.getElementById('promo_start_date'));
-            lockDateNoPast(document.getElementById('promo_end_date'));
+            const startEl = document.getElementById('promo_start_date');
+            const endEl = document.getElementById('promo_end_date');
+            Promise.all([populatePromoCategoryAndDrugSelects(), populatePromoSegmentSelect()]).then(() => {
+                if (!isEdit) {
+                    applyPromoScopeFields('all');
+                    lockDateNoPast(startEl);
+                    lockDateNoPast(endEl);
+                    updatePromoDrugsCount();
+                    return;
+                }
+                const scope = promoScopeOf(promo);
+                applyPromoScopeFields(scope);
+                const nameEl = document.getElementById('promo_name');
+                const typeEl = document.getElementById('promo_discount_type');
+                const valueEl = document.getElementById('promo_discount_value');
+                if (nameEl) nameEl.value = promo.name || '';
+                if (typeEl) typeEl.value = promo.discount_type || 'percent';
+                if (valueEl) valueEl.value = promo.discount_value || '';
+                if (startEl) {
+                    startEl.min = '';
+                    startEl.value = String(promo.start_date || '').slice(0, 10);
+                }
+                if (endEl) {
+                    endEl.min = '';
+                    endEl.value = String(promo.end_date || '').slice(0, 10);
+                }
+                if (scope === 'category' && promo.category) {
+                    const catSel = document.getElementById('promo_category');
+                    if (catSel) catSel.value = promo.category;
+                }
+                if (scope === 'drug' && promo.drug_id) {
+                    const drugSel = document.getElementById('promo_drug_id');
+                    if (drugSel) drugSel.value = String(promo.drug_id);
+                }
+                if (scope === 'segment' && promo.segment_label) {
+                    const segSel = document.getElementById('promo_segment');
+                    if (segSel) {
+                        const exists = [...segSel.options].some((o) => o.value === promo.segment_label);
+                        if (!exists) {
+                            const opt = document.createElement('option');
+                            opt.value = promo.segment_label;
+                            opt.textContent = promo.segment_label;
+                            segSel.appendChild(opt);
+                        }
+                        segSel.value = promo.segment_label;
+                    }
+                }
+                promoSelectedDrugIds = new Set((promo.drug_ids || []).map(String));
+                if (promo.drug_id && !promoSelectedDrugIds.size) promoSelectedDrugIds.add(String(promo.drug_id));
+                renderPromoDrugsChecklist(promosDrugList);
+                updatePromoDrugsCount();
+            });
             const modal = document.getElementById('addPromoModal');
             if (modal) modal.style.display = 'flex';
-        });
+        };
+
+        document.getElementById('addPromoBtn')?.addEventListener('click', () => openPromoModal(null));
         document.getElementById('closeAddPromoModal')?.addEventListener('click', () => {
             const modal = document.getElementById('addPromoModal');
             if (modal) modal.style.display = 'none';
@@ -3084,7 +3213,7 @@
             const today = manilaTodayYmd();
             const startDate = document.getElementById('promo_start_date')?.value || '';
             const endDate = document.getElementById('promo_end_date')?.value || '';
-            if (startDate < today || endDate < today) {
+            if (!editingPromoId && (startDate < today || endDate < today)) {
                 alert('Promo dates cannot be in the past.');
                 return;
             }
@@ -3101,16 +3230,22 @@
                 start_date: document.getElementById('promo_start_date').value,
                 end_date: document.getElementById('promo_end_date').value,
             };
-            fetch('/api/admin/promos', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            const url = editingPromoId ? ('/api/admin/promos/' + encodeURIComponent(editingPromoId)) : '/api/admin/promos';
+            const method = editingPromoId ? 'PUT' : 'POST';
+            fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
             })
                 .then(res => res.json())
                 .then(result => {
                     if (result.success) {
                         document.getElementById('addPromoModal').style.display = 'none';
+                        editingPromoId = null;
                         loadPromos();
                     } else {
-                        alert(result.message || 'Failed to create promo.');
+                        alert(result.message || (editingPromoId ? 'Failed to update promo.' : 'Failed to create promo.'));
                     }
                 })
                 .catch(err => alert('Error: ' + err.message));
@@ -3934,7 +4069,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="addPromoModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2><i class="fas fa-tags"></i> Create Promo</h2>
+                <h2 id="promoModalTitle"><i class="fas fa-tags"></i> Create Promo</h2>
                 <span class="close" id="closeAddPromoModal">&times;</span>
             </div>
             <form id="addPromoForm">
@@ -3984,7 +4119,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <label for="promo_end_date">End Date:</label>
                 <input type="date" id="promo_end_date" required>
 
-                <button type="button" id="submitPromoBtn" style="background: #4BAA8B;margin-top:12px;" class="update"><i class="fas fa-check"></i> Create Promo</button>
+                <button type="button" id="submitPromoBtn" style="background: #4BAA8B;margin-top:12px;" class="update"><i class="fas fa-check"></i> <span id="submitPromoBtnLabel">Create Promo</span></button>
             </form>
         </div>
     </div>
