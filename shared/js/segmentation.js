@@ -111,9 +111,13 @@
         segmentationDataLoading = true;
         const badge = document.getElementById('segmentEngineBadge');
         if (badge) {
-            badge.innerHTML = canManage()
-                ? '<i class="fas fa-spinner fa-spin"></i> Running K-Means clustering...'
-                : '<i class="fas fa-spinner fa-spin"></i> Loading Admin segment snapshot...';
+            if (!canManage()) {
+                badge.innerHTML = '';
+                badge.style.display = 'none';
+            } else {
+                badge.style.display = '';
+                badge.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running K-Means clustering...';
+            }
         }
 
         return fetch('/api/cashier/segmentation', { credentials: 'same-origin' })
@@ -134,7 +138,12 @@
             })
             .catch((err) => {
                 console.error('[PharmaLink] Failed to load segmentation data:', err);
-                if (badge) badge.innerHTML = '<i class="fas fa-triangle-exclamation"></i> Failed to load segmentation data.';
+                if (badge) {
+                    badge.style.display = canManage() ? '' : 'none';
+                    badge.innerHTML = canManage()
+                        ? '<i class="fas fa-triangle-exclamation"></i> Failed to load segmentation data.'
+                        : '';
+                }
             })
             .finally(() => { segmentationDataLoading = false; });
     }
@@ -174,6 +183,12 @@
     function renderSegmentEngineBadge(n) {
         const el = document.getElementById('segmentEngineBadge');
         if (!el) return;
+        if (!canManage()) {
+            el.innerHTML = '';
+            el.style.display = 'none';
+            return;
+        }
+        el.style.display = '';
         if (segmentEngine === 'kmeans') {
             const score = segmentSilhouette[n];
             const scoreText = (score !== undefined && score !== null) ? ` &middot; Silhouette Score: <strong>${score}</strong>` : '';
@@ -538,6 +553,11 @@
         if (wrap) {
             wrap.style.display = canManage() ? '' : 'none';
             if (canManage()) wrap.title = 'Cashiers will see this number of groups.';
+        }
+        const engineBadge = document.getElementById('segmentEngineBadge');
+        if (engineBadge && !canManage()) {
+            engineBadge.innerHTML = '';
+            engineBadge.style.display = 'none';
         }
         let lock = document.getElementById('segActiveKLabel');
         if (!canManage()) {
