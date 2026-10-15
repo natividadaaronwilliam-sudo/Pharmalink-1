@@ -153,6 +153,7 @@ html, body {
 #home .dash-table-items th:nth-child(4),
 #home .dash-table-items td:nth-child(4){ text-align:right; white-space:nowrap; color:#4BAA8B; }
 #home .dash-table-logs td:nth-child(2){ color:#4BAA8B; white-space:nowrap; }
+#home .dash-table-logs td:first-child{ max-width:168px; word-break:break-word; }
 #home .dash-item-sub{ color:#9ca3af; font-size:.72rem; font-weight:600; margin-top:2px; }
 #home .dash-empty-cell{ text-align:center; color:#9ca3af; padding:32px 12px !important; }
 #home .mo-pay{
@@ -763,6 +764,8 @@ body.customer-guest #customerNotificationBell{ display:none !important; }
 }
 #products .product{
     display:flex; flex-direction:column;
+    height:100%;
+    box-sizing:border-box;
     border-radius:16px; padding:16px;
     border:1px solid #FFE3B3;
 }
@@ -780,23 +783,26 @@ body.customer-guest #customerNotificationBell{ display:none !important; }
 #products .shop-generic,
 #products .shop-spec{
     margin:0; color:#4BAA8B; font-size:.84rem; line-height:1.35;
+    min-height:1.35em;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 #products .shop-spec{ margin-bottom:12px; }
 #products .shop-card-foot{
-    display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
     margin-top:auto; margin-bottom:12px;
 }
 #products .shop-price{ margin:0; font-size:1.2rem; font-weight:800; color:#047857; }
-#products .shop-stock{ margin:0; font-size:.78rem; font-weight:700; }
+#products .shop-stock{ margin:0; font-size:.78rem; font-weight:700; white-space:nowrap; flex-shrink:0; }
 #products .shop-stock-ok{ color:#4BAA8B; }
 #products .shop-stock-low{ color:#1E3A34; }
 #products .shop-stock-out{ color:#dc2626; }
 #products .product .add-btn{
     width:100% !important; margin:0 !important;
+    min-height:42px;
     padding:10px 12px !important; font-size:13px !important;
     background:#1E3A34 !important; box-shadow:none !important;
     justify-content:center;
+    white-space:nowrap;
 }
 #products .shop-empty{
     grid-column:1/-1; text-align:center; color:#4BAA8B;

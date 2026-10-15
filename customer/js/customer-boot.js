@@ -40,7 +40,7 @@
         }
 
         const script = document.createElement('script');
-        script.src = '/customer/js/customer.js?v=txn-match1';
+        script.src = '/customer/js/customer.js?v=txn-ord2';
         document.body.appendChild(script);
     });
 

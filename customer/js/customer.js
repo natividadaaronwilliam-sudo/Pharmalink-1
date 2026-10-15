@@ -30,16 +30,22 @@ onCustomerReady(function() {
     const clearCartBtn = document.getElementById('clear-cart-btn');
     const emptyCartMessage = document.getElementById('emptyCartMessage');
 
+    function orderNoLabel(row) {
+        if ((row && row.kind) === 'online' && row.order_id) return 'ORD-' + row.order_id;
+        return '';
+    }
+
     function txnLabel(row) {
         const txn = String((row && row.transaction_id) || '').trim();
         if (txn) return txn;
         if ((row && row.kind) === 'walkin') return 'SALE-' + row.order_id;
-        return 'ORD-' + ((row && row.order_id) || '');
+        return orderNoLabel(row) || ('ORD-' + ((row && row.order_id) || ''));
     }
 
-    function orderNoLabel(row) {
-        if ((row && row.kind) === 'online' && row.order_id) return 'ORD-' + row.order_id;
-        return '';
+    function txnSubLabel(row) {
+        const ord = orderNoLabel(row);
+        if (!ord) return '';
+        return ord === txnLabel(row) ? '' : ord;
     }
 
     // Modals
@@ -209,7 +215,7 @@ if (target === 'orders') {
             const kind = row.kind === 'walkin' ? 'walkin' : 'online';
             const kindLabel = kind === 'walkin' ? 'Walk-in' : 'Online';
             const cls = homeStatusClass(row.order_status);
-            const ord = orderNoLabel(row);
+            const ord = txnSubLabel(row);
             return `<tr>
                 <td><strong>${txnLabel(row)}</strong>${ord ? `<div class="dash-item-sub">${ord}</div>` : ''}</td>
                 <td>${row.order_date || '-'}</td>
@@ -427,7 +433,7 @@ window.loadCustomerOrders = function(type = 'all', startDate = '', endDate = '')
             const pendingCancel = kind === 'online' && String(row.order_status || '').toLowerCase() === 'pending'
                 ? `<button type="button" class="mo-cancel" onclick="cancelPendingOrder(${Number(row.order_id)})">Cancel</button>`
                 : '';
-            const ord = orderNoLabel(row);
+            const ord = txnSubLabel(row);
             return `<tr>
                 <td><strong>${txnLabel(row)}</strong>${ord ? `<div class="dash-item-sub">${ord}</div>` : ''}</td>
                 <td>${row.order_date || '-'}</td>
@@ -528,7 +534,7 @@ function displayOrderDetails(data) {
         const statusColor = getStatusColor(data.status);
 
         const detailTxn = txnLabel(data);
-        const detailOrd = orderNoLabel(data);
+        const detailOrd = txnSubLabel(data);
         orderDetailsContent.innerHTML = `
             <div class="mo-detail-head">
                 <h4>${detailTxn}</h4>
