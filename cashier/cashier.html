@@ -3222,6 +3222,12 @@ function srEsc(s) {
     }[c]));
 }
 
+function shortTxnId(value) {
+    const s = String(value || '').trim();
+    const parts = /^TXN-\d+-(\d+)$/i.exec(s);
+    return parts ? ('TXN-' + parts[1]) : s;
+}
+
 function srPayLabel(method) {
     const m = String(method || 'cash').toLowerCase();
     if (m === 'gcash') return 'GCash';
@@ -3262,7 +3268,7 @@ function loadSalesReport() {
             body.innerHTML = logs.map((t) => {
                 const pay = String(t.payment_method || 'cash').toLowerCase();
                 return '<tr>' +
-                    '<td>' + srEsc(t.transaction_id) + (t.order_no ? '<div style="font-size:0.8em;color:#64748b;">' + srEsc(t.order_no) + '</div>' : '') + '</td>' +
+                    '<td title="' + srEsc(t.transaction_id) + '">' + srEsc(shortTxnId(t.transaction_id)) + (t.order_no ? '<div style="font-size:0.8em;color:#64748b;">' + srEsc(t.order_no) + '</div>' : '') + '</td>' +
                     '<td>' + srEsc(t.date) + '</td>' +
                     '<td>' + srEsc(t.time) + '</td>' +
                     '<td>' + srEsc(t.customer_name) + '</td>' +
@@ -3377,7 +3383,10 @@ function openSalesReportDetail(saleId) {
             const s = data.sale;
             srLoadedDetail = { sale: s, items: data.items || [] };
             if (reprintBtn) reprintBtn.disabled = false;
-            if (title) title.textContent = s.transaction_id;
+            if (title) {
+                title.textContent = shortTxnId(s.transaction_id);
+                title.title = s.transaction_id || '';
+            }
             const itemRows = (data.items || []).map((it) =>
                 '<tr><td>' + srEsc(it.name) + (it.promo_name ? ' <small>' + srEsc(it.promo_name) + '</small>' : '') +
                 '</td><td>' + it.quantity + '</td><td>₱' + Number(it.price).toFixed(2) +

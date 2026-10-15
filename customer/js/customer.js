@@ -35,9 +35,15 @@ onCustomerReady(function() {
         return '';
     }
 
+    function shortTxnId(value) {
+        const s = String(value || '').trim();
+        const parts = /^TXN-\d+-(\d+)$/i.exec(s);
+        return parts ? ('TXN-' + parts[1]) : s;
+    }
+
     function txnLabel(row) {
         const txn = String((row && row.transaction_id) || '').trim();
-        if (txn) return txn;
+        if (txn) return shortTxnId(txn);
         if ((row && row.kind) === 'walkin') return 'SALE-' + row.order_id;
         return orderNoLabel(row) || ('ORD-' + ((row && row.order_id) || ''));
     }
@@ -216,8 +222,9 @@ if (target === 'orders') {
             const kindLabel = kind === 'walkin' ? 'Walk-in' : 'Online';
             const cls = homeStatusClass(row.order_status);
             const ord = txnSubLabel(row);
+            const fullTxn = String(row.transaction_id || '').trim();
             return `<tr>
-                <td><strong>${txnLabel(row)}</strong>${ord ? `<div class="dash-item-sub">${ord}</div>` : ''}</td>
+                <td><strong${fullTxn ? ` title="${fullTxn}"` : ''}>${txnLabel(row)}</strong>${ord ? `<div class="dash-item-sub">${ord}</div>` : ''}</td>
                 <td>${row.order_date || '-'}</td>
                 <td><span class="dash-kind dash-kind-${kind}">${kindLabel}</span></td>
                 <td><span class="mo-pay">${homePayLabel(row.payment_method)}</span></td>
@@ -434,8 +441,9 @@ window.loadCustomerOrders = function(type = 'all', startDate = '', endDate = '')
                 ? `<button type="button" class="mo-cancel" onclick="cancelPendingOrder(${Number(row.order_id)})">Cancel</button>`
                 : '';
             const ord = txnSubLabel(row);
+            const fullTxn = String(row.transaction_id || '').trim();
             return `<tr>
-                <td><strong>${txnLabel(row)}</strong>${ord ? `<div class="dash-item-sub">${ord}</div>` : ''}</td>
+                <td><strong${fullTxn ? ` title="${fullTxn}"` : ''}>${txnLabel(row)}</strong>${ord ? `<div class="dash-item-sub">${ord}</div>` : ''}</td>
                 <td>${row.order_date || '-'}</td>
                 <td><span class="mo-pay">${pay}</span></td>
                 <td><span class="status ${cls}">${row.order_status || '-'}</span></td>
@@ -535,9 +543,10 @@ function displayOrderDetails(data) {
 
         const detailTxn = txnLabel(data);
         const detailOrd = txnSubLabel(data);
+        const fullTxn = String(data.transaction_id || '').trim();
         orderDetailsContent.innerHTML = `
             <div class="mo-detail-head">
-                <h4>${detailTxn}</h4>
+                <h4${fullTxn ? ` title="${fullTxn}"` : ''}>${detailTxn}</h4>
                 <p>${data.customer_name || ''}</p>
                 ${detailOrd ? `<p>Order ${detailOrd}</p>` : ''}
             </div>

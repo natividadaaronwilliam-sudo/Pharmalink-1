@@ -40,7 +40,7 @@
         }
 
         const script = document.createElement('script');
-        script.src = '/customer/js/customer.js?v=txn-ord2';
+        script.src = '/customer/js/customer.js?v=txn-short1';
         document.body.appendChild(script);
     });
 
@@ -103,11 +103,13 @@
                 const stock = parseInt(p.current_stock, 10) || 0;
                 const price = Number(p.price) || 0;
                 const stockClass = stock <= 0 ? 'shop-stock-out' : (stock <= 10 ? 'shop-stock-low' : 'shop-stock-ok');
+                const generic = String(p.generic_name || '').trim();
                 return `<div class="product" data-category="${esc(p.category)}" data-name-search="${esc(displayName)}" data-sort-name="${esc(sortName)}" data-price="${price}" data-stock="${stock}">
                     <span class="shop-cat">${esc(p.category)}</span>
                     <h4>${esc(p.brand_name)}</h4>
-                    <p class="shop-generic">${esc(p.generic_name)}</p>
+                    <p class="shop-generic">${generic ? esc(generic) : '&nbsp;'}</p>
                     <p class="shop-spec">${esc(p.dosage)} · ${esc(p.form)}</p>
+                    <div class="shop-card-actions">
                     <div class="shop-card-foot">
                         <p class="shop-price">₱${price.toFixed(2)}</p>
                         <p class="shop-stock ${stockClass}">${stock} in stock</p>
@@ -120,6 +122,7 @@
                         data-stock="${stock}">
                         <i class="fas fa-cart-plus"></i> Add to Cart
                     </button>
+                    </div>
                 </div>`;
             }).join('');
         } catch (err) {
