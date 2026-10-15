@@ -19,25 +19,6 @@
 }
 .nav-short{ display:none; }
 
-.staff-rx-media iframe,
-.staff-rx-media img{
-    display:block;
-    width:100%;
-    max-height:70vh;
-    background:#fff;
-}
-.staff-rx-text{
-    white-space:pre-wrap;
-    background:#f8fafc;
-    border:1px solid #e5e7eb;
-    border-radius:8px;
-    padding:10px 12px;
-    margin-top:12px;
-    max-height:180px;
-    overflow:auto;
-    font-size:13px;
-}
-
 /* =======================================
    CASHIER DASHBOARD
    ======================================= */
