@@ -1171,6 +1171,12 @@ function storeReceiptHeaderHtml() {
         '<p class="addr">29 Alcalde Jose, Kapasigan, Pasig, 1600 Metro Manila</p></div>';
 }
 
+function shortTxnId(value) {
+    const s = String(value || '').trim();
+    const parts = /^TXN-\d+-(\d+)$/i.exec(s);
+    return parts ? ('TXN-' + parts[1]) : s;
+}
+
 function printReceipt(responseData, saleData, printWindow) {
     const transactionId = responseData.transaction_id || 'N/A';
     const txnDisplay = shortTxnId(transactionId);
@@ -3223,12 +3229,6 @@ function srEsc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
-}
-
-function shortTxnId(value) {
-    const s = String(value || '').trim();
-    const parts = /^TXN-\d+-(\d+)$/i.exec(s);
-    return parts ? ('TXN-' + parts[1]) : s;
 }
 
 function srPayLabel(method) {
