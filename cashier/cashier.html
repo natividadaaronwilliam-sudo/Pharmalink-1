@@ -2610,7 +2610,7 @@ function openBarcodeScanner(mode = 'cart') {
             setTimeout(() => { barcodeScanCooldown = false; }, 2000); // debounce repeated frames of the same code
         }
     }).catch(err => {
-        if (statusEl) statusEl.textContent = '❌ Camera access failed: ' + err.message + ' (allow camera permission and use HTTPS or localhost).';
+        if (statusEl) statusEl.textContent = '❌ Camera access failed: ' + err.message;
     });
 }
 
