@@ -773,60 +773,33 @@ async def preview_purchase_order_email(request: Request):
     )
 
 
+def _mail_fail_message(po_number, sent=None, extra=""):
+    reason = extra or ((sent or {}).get("message") or "").strip()
+    if reason and reason.lower() != "sent":
+        return f"{po_number} is still Pending. The email was not sent. {reason}"
+    return f"{po_number} is still Pending. The email was not sent."
+
+
 @router.post("/purchase-orders/{po_id}/email")
-async def email_purchase_order(po_id: int, request: Request):
-    """Send the preview HTML. Does not create a purchase order."""
+def email_purchase_order(po_id: int, request: Request):
+    """Email the saved purchase order. Rebuilds the document on the server."""
     if not require_admin(request):
         return _unauthorized()
-    data = await request.json()
-    html_doc = str(data.get("html") or "")
-    subject = str(data.get("subject") or "").strip()
-    po = fetch_one(
-        """
-        SELECT po.po_id, po.status, s.email, s.supplier_name
-        FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
-        WHERE po.po_id = %s
-        """,
-        (po_id,),
-    )
-    if not po:
-        return {"success": False, "email_sent": False, "message": "Purchase order not found."}
-    po = _row(po)
-    po_number = f"PO-{int(po['po_id']):05d}"
-    email = (po.get("email") or "").strip()
-    if not email:
+    try:
+        result = send_saved_purchase_order(po_id, actor=actor_display_name(request, "Admin"))
+    except Exception as exc:
         return {
             "success": False,
             "email_sent": False,
-            "message": "This supplier has no email. Add it on the supplier record.",
+            "message": f"The email was not sent. {exc}",
         }
-    expected_subject = _po_email_subject(po_number)
-    if subject != expected_subject or po_number not in html_doc:
-        return {
-            "success": False,
-            "email_sent": False,
-            "message": "The preview does not match this purchase order. Open it again.",
-        }
-    sent = send_mail(email, expected_subject, html_doc)
-    if sent.get("success"):
-        log_event("Email Purchase Order", f"Emailed {po_number} to {email}.", request=request)
-        return {
-            "success": True,
-            "email_sent": True,
-            "po_number": po_number,
-            "message": f"Emailed {po_number} to {email}.",
-        }
-    log_event(
-        "Email Purchase Order",
-        f"Did not email {po_number} to {email}.",
-        request=request,
-    )
-    return {
-        "success": True,
-        "email_sent": False,
-        "po_number": po_number,
-        "message": f"{po_number} is still Pending. The email was not sent.",
-    }
+    if result.get("email_sent"):
+        return {"success": True, **result}
+    if (result.get("message") or "") == "Purchase order not found.":
+        return {"success": False, "email_sent": False, **result}
+    if "no email" in (result.get("message") or "").lower():
+        return {"success": False, "email_sent": False, **result}
+    return {"success": True, **result}
 
 
 def send_saved_purchase_order(po_id: int, actor: str = "System") -> dict:
@@ -854,7 +827,7 @@ def send_saved_purchase_order(po_id: int, actor: str = "System") -> dict:
     po_number = f"PO-{int(po['po_id']):05d}"
     if err:
         log_event("Email Purchase Order", f"Did not email {po_number}. {err}", actor=actor)
-        return {"email_sent": False, "po_number": po_number, "message": f"{po_number} is still Pending. The email was not sent."}
+        return {"email_sent": False, "po_number": po_number, "message": _mail_fail_message(po_number, extra=err)}
     payload = _email_preview_payload(
         po_number,
         po.get("supplier_name") or "",
@@ -875,11 +848,15 @@ def send_saved_purchase_order(po_id: int, actor: str = "System") -> dict:
     if sent.get("success"):
         log_event("Email Purchase Order", f"Emailed {po_number} to {payload['to']}.", actor=actor)
         return {"email_sent": True, "po_number": po_number, "message": f"Emailed {po_number} to {payload['to']}."}
-    log_event("Email Purchase Order", f"Did not email {po_number} to {payload['to']}.", actor=actor)
+    log_event(
+        "Email Purchase Order",
+        f"Did not email {po_number} to {payload['to']}. {sent.get('message') or ''}".strip(),
+        actor=actor,
+    )
     return {
         "email_sent": False,
         "po_number": po_number,
-        "message": f"{po_number} is still Pending. The email was not sent.",
+        "message": _mail_fail_message(po_number, sent),
     }
 
 

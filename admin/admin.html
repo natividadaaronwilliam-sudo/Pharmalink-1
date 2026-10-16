@@ -3364,10 +3364,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const body = document.getElementById('poBody');
         if (body) body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ph-text-faint);padding:15px;">Loading...</td></tr>';
         fetch(url)
-            .then(res => {
-                if (!res.ok) throw new Error('Server returned ' + res.status + ' ' + res.statusText);
-                return res.json();
-            })
+            .then(res => res.text().then(text => {
+                if (!res.ok) throw new Error('Server returned ' + res.status);
+                try {
+                    return text ? JSON.parse(text) : [];
+                } catch (err) {
+                    throw new Error('Server returned ' + res.status);
+                }
+            }))
             .then(orders => {
                 if (!body) return;
                 if (!Array.isArray(orders) || orders.length === 0) {
@@ -3620,7 +3624,18 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ html: draft.html, subject: draft.subject }),
-        }).then(res => res.json());
+        }).then(res => res.text().then(text => {
+            let data = {};
+            try { data = text ? JSON.parse(text) : {}; } catch (err) { data = {}; }
+            if (!res.ok) {
+                return {
+                    success: false,
+                    email_sent: false,
+                    message: data.message || ('Server returned ' + res.status),
+                };
+            }
+            return data;
+        }));
     }
 
     function finishPoEmail(message, sent) {
@@ -4223,7 +4238,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
-    <script src="/admin/js/inventory.js?v=recv1"></script>
+    <script src="/admin/js/inventory.js?v=recv2"></script>
     <script src="/admin/js/supplier.js?v=no-policy1"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {

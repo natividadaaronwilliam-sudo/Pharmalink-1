@@ -935,7 +935,12 @@
         const excludeExpired = status === 'active' ? '1' : '0';
         const params = new URLSearchParams({ status, exclude_expired: excludeExpired });
         return fetch('/api/admin/lots?' + params.toString())
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error('Server returned ' + res.status);
+                const ctype = (res.headers.get('content-type') || '').toLowerCase();
+                if (!ctype.includes('application/json')) throw new Error('Server returned ' + res.status);
+                return res.json();
+            })
             .then(data => {
                 lots = Array.isArray(data) ? data : [];
                 renderSummaryCards();
