@@ -515,10 +515,13 @@ async def create_po(request: Request):
         drug_id = int(it.get("drug_id") or 0)
         qty = int(it.get("quantity_ordered") or 0)
         unit_cost = float(it["unit_cost"]) if it.get("unit_cost") not in (None, "") else None
-        if drug_id and qty > 0:
-            items.append((drug_id, qty, unit_cost))
+        if not drug_id:
+            continue
+        if qty < 1:
+            return {"success": False, "message": "Quantity must be at least 1."}
+        items.append((drug_id, qty, unit_cost))
     if not items:
-        return {"success": False, "message": "Please add at least one item with a valid quantity."}
+        return {"success": False, "message": "Please add at least one item with a quantity of 1 or more."}
     supplier = fetch_one(
         "SELECT supplier_id, supplier_name FROM suppliers WHERE supplier_id = %s AND status = 'Active'",
         (supplier_id,),
@@ -659,8 +662,10 @@ def _lines_for_items(raw_items) -> tuple[list, str | None]:
     for it in raw_items or []:
         drug_id = int(it.get("drug_id") or 0)
         qty = int(it.get("quantity_ordered") or it.get("quantity") or 0)
-        if not drug_id or qty <= 0:
+        if not drug_id:
             continue
+        if qty < 1:
+            return [], "Quantity must be at least 1."
         cost_raw = it.get("unit_cost")
         cost = None if cost_raw in (None, "") else round(float(cost_raw), 2)
         if cost is not None and cost < 0:
@@ -884,9 +889,17 @@ async def receive_delivery(request: Request):
         qty = int(it.get("quantity_received") or 0)
         if qty <= 0 or po_item_id not in po_items:
             continue
+        if qty < 1:
+            return {"success": False, "message": "Quantity must be at least 1."}
         if qty > remaining.get(po_item_id, 0):
-            return {"success": False, "message": "Quantity cannot exceed the outstanding amount on this purchase order."}
+            return {"success": False, "message": "Quantity cannot exceed the ordered amount still outstanding on this purchase order."}
         remaining[po_item_id] = remaining[po_item_id] - qty
+        try:
+            pcs_per_box = int(it.get("pieces_per_box") or 0)
+        except (TypeError, ValueError):
+            pcs_per_box = 0
+        if pcs_per_box < 1:
+            return {"success": False, "message": "Each received item needs pieces per box (at least 1)."}
         lot_number = str(it.get("lot_number") or "").strip()
         expiration_date = it.get("expiration_date") or ""
         if not lot_number or not expiration_date:
@@ -896,17 +909,19 @@ async def receive_delivery(request: Request):
             return {"success": False, "message": "Each received item needs a valid expiration date."}
         if exp < _manila_today():
             return {"success": False, "message": "Expiration date cannot be in the past."}
-        cost_val = float(it["cost_price"]) if it.get("cost_price") not in (None, "") else None
-        if cost_val is None or cost_val <= 0:
-            return {"success": False, "message": "Each received item needs a unit cost. Selling price is computed from category markup."}
+        cost_box = float(it["cost_price"]) if it.get("cost_price") not in (None, "") else None
+        if cost_box is None or cost_box <= 0:
+            return {"success": False, "message": "Each received item needs a cost per box. Selling price per piece is computed from markup."}
+        cost_piece = round(cost_box / pcs_per_box, 4)
         to_receive.append({
             "po_item_id": po_item_id,
             "drug_id": int(po_items[po_item_id]["drug_id"]),
             "lot_number": lot_number,
             "expiration_date": expiration_date,
             "quantity_received": qty,
+            "stock_qty": qty * pcs_per_box,
             "price": 0,
-            "cost_price": cost_val,
+            "cost_price": cost_piece,
         })
     if not to_receive:
         return {"success": False, "message": "Please enter at least one item with a quantity, lot number, and expiration date."}
@@ -934,7 +949,7 @@ async def receive_delivery(request: Request):
                         it["drug_id"],
                         it["lot_number"],
                         it["expiration_date"],
-                        it["quantity_received"],
+                        it["stock_qty"],
                         it["price"],
                         it["cost_price"],
                         po_id,
