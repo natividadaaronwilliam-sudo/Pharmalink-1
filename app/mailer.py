@@ -23,11 +23,48 @@ def _clean(value: str) -> str:
     return (value or "").strip().strip('"').strip("'")
 
 
+def _connect_ipv4_first(host, port, timeout, source_address=None):
+    """Prefer IPv4. Render often has no IPv6 route, which raises errno 101."""
+    last_err = None
+    for family in (socket.AF_INET, socket.AF_INET6):
+        try:
+            infos = socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
+        except OSError as exc:
+            last_err = exc
+            continue
+        for af, socktype, proto, _canon, sa in infos:
+            sock = socket.socket(af, socktype, proto)
+            try:
+                if timeout is not None:
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+                sock.connect(sa)
+                return sock
+            except OSError as exc:
+                last_err = exc
+                sock.close()
+    if last_err:
+        raise last_err
+    raise OSError(101, "Network is unreachable")
+
+
+class _SMTP(smtplib.SMTP):
+    def _get_socket(self, host, port, timeout):
+        return _connect_ipv4_first(host, port, timeout, self.source_address)
+
+
+class _SMTP_SSL(smtplib.SMTP_SSL):
+    def _get_socket(self, host, port, timeout):
+        sock = _connect_ipv4_first(host, port, timeout, self.source_address)
+        return self.context.wrap_socket(sock, server_hostname=host or self._host)
+
+
 def _send_once(host: str, port: int, mode: str, user: str, password: str, msg: EmailMessage) -> None:
     if mode == "ssl":
-        smtp = smtplib.SMTP_SSL(host, port, timeout=_SMTP_TIMEOUT)
+        smtp = _SMTP_SSL(host, port, timeout=_SMTP_TIMEOUT)
     else:
-        smtp = smtplib.SMTP(host, port, timeout=_SMTP_TIMEOUT)
+        smtp = _SMTP(host, port, timeout=_SMTP_TIMEOUT)
         smtp.ehlo()
         smtp.starttls()
         smtp.ehlo()
