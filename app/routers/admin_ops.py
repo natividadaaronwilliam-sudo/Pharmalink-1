@@ -773,7 +773,7 @@ async def preview_purchase_order_email(request: Request):
     )
 
 
-def _mail_fail_message(po_number: str, sent: dict | None = None, extra: str = "") -> str:
+def _mail_fail_message(po_number, sent=None, extra=""):
     reason = extra or ((sent or {}).get("message") or "").strip()
     if reason and reason.lower() != "sent":
         return f"{po_number} is still Pending. The email was not sent. {reason}"
@@ -781,15 +781,18 @@ def _mail_fail_message(po_number: str, sent: dict | None = None, extra: str = ""
 
 
 @router.post("/purchase-orders/{po_id}/email")
-async def email_purchase_order(po_id: int, request: Request):
+def email_purchase_order(po_id: int, request: Request):
     """Email the saved purchase order. Rebuilds the document on the server."""
     if not require_admin(request):
         return _unauthorized()
     try:
-        await request.json()
-    except Exception:
-        pass
-    result = send_saved_purchase_order(po_id, actor=actor_display_name(request, "Admin"))
+        result = send_saved_purchase_order(po_id, actor=actor_display_name(request, "Admin"))
+    except Exception as exc:
+        return {
+            "success": False,
+            "email_sent": False,
+            "message": f"The email was not sent. {exc}",
+        }
     if result.get("email_sent"):
         return {"success": True, **result}
     if (result.get("message") or "") == "Purchase order not found.":
