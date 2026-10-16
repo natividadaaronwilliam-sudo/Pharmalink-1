@@ -561,7 +561,7 @@
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="inventoryBody"></tbody>
+                                <tbody id="inventoryBody"><tr><td colspan="13" class="inv-empty">Loading...</td></tr></tbody>
                             </table>
                         </div>
                         <div class="um-pagination ph-pagination" id="lots-pagination">
@@ -962,11 +962,12 @@
         <div class="left filter">
             <label for="poStatusFilter">Status:</label>
             <select id="poStatusFilter">
-                <option value="">All</option>
+                <option value="open" selected>To receive</option>
                 <option value="Pending">Pending</option>
                 <option value="Partially Received">Partially Received</option>
                 <option value="Received">Received</option>
                 <option value="Cancelled">Cancelled</option>
+                <option value="">All</option>
             </select>
         </div>
         <button type="button" id="createPoBtn"><i class="fas fa-plus"></i> Create Purchase Order</button>
@@ -3325,6 +3326,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function bindReceiveQtyCaps(root) {
+        if (!root) return;
+        const clamp = (input) => {
+            const row = input.closest('.po-receive-row');
+            const max = Math.max(0, parseInt(row?.getAttribute('data-outstanding') || '0', 10) || 0);
+            let v = parseInt(input.value, 10);
+            if (!Number.isFinite(v) || v < 0) v = 0;
+            if (v > max) v = max;
+            if (String(input.value) !== String(v)) input.value = String(v);
+        };
+        root.querySelectorAll('.recv-qty').forEach(clamp);
+        if (!root.dataset.qtyBound) {
+            root.dataset.qtyBound = '1';
+            root.addEventListener('input', (e) => {
+                if (!e.target.classList.contains('recv-qty')) return;
+                clamp(e.target);
+            });
+        }
+    }
+
     // ---------- Supplier + Drug lookups (shared by Create + Receive) ----------
     function loadPoLookups() {
         return Promise.all([
@@ -3341,6 +3362,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = document.getElementById('poStatusFilter')?.value || '';
         const url = '/api/admin/purchase-orders' + (status ? ('?status=' + encodeURIComponent(status)) : '');
         const body = document.getElementById('poBody');
+        if (body) body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ph-text-faint);padding:15px;">Loading...</td></tr>';
         fetch(url)
             .then(res => {
                 if (!res.ok) throw new Error('Server returned ' + res.status + ' ' + res.statusText);
@@ -3727,7 +3749,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <span style="font-size:12px;color:var(--ph-text-soft);">Ordered: ${it.quantity_ordered} · Received: ${it.quantity_received} · Outstanding: ${it.quantity_outstanding}</span>
                                 </div>
                                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:8px;">
-                                    <div><label style="${labelStyle}">Qty Now</label><input type="number" class="recv-qty" min="0" max="${it.quantity_outstanding}" value="0" ${done ? 'disabled' : ''}></div>
+                                    <div><label style="${labelStyle}">Qty Now</label><input type="number" class="recv-qty" min="0" max="${it.quantity_outstanding}" value="${it.quantity_outstanding}" ${done ? 'disabled' : ''}></div>
                                     <div><label style="${labelStyle}">Lot #</label><input type="text" class="recv-lot" placeholder="Lot #" ${done ? 'disabled' : ''}></div>
                                     <div><label style="${labelStyle}">Expiration</label><input type="date" class="recv-exp" min="${manilaTodayYmd()}" ${done ? 'disabled' : ''}></div>
                                     <div><label style="${labelStyle}">Cost</label><input type="number" class="recv-cost" min="0" step="0.01" placeholder="Type unit cost" value="" ${done ? 'disabled' : ''}></div>
@@ -3736,6 +3758,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>`;
                     }).join('');
                     bindReceiveMarkupHints(receiveBody);
+                    bindReceiveQtyCaps(receiveBody);
                 }
 
                 const historyEl = document.getElementById('poDeliveryHistory');
@@ -3848,7 +3871,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentPoId) return;
 
         const items = Array.from(document.querySelectorAll('#poReceiveBody .po-receive-row')).map(row => {
-            const qty = parseInt(row.querySelector('.recv-qty')?.value, 10) || 0;
+            const outstanding = Math.max(0, parseInt(row.dataset.outstanding, 10) || 0);
+            let qty = parseInt(row.querySelector('.recv-qty')?.value, 10) || 0;
+            if (qty > outstanding) qty = outstanding;
             return {
                 po_item_id: row.dataset.poItemId,
                 quantity_received: qty,
@@ -3903,6 +3928,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert(`Delivery received: ${result.lots_created} lot(s) created. PO status: ${result.po_status}.`);
                     loadPurchaseOrders();
                     openViewPoModal(currentPoId); // refresh the modal in place (shows updated outstanding qty + history)
+                    if (typeof window.fetchLots === 'function') window.fetchLots();
                 } else {
                     alert(result.message || 'Failed to receive delivery.');
                 }
@@ -4197,7 +4223,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
-    <script src="/admin/js/inventory.js?v=minmax1"></script>
+    <script src="/admin/js/inventory.js?v=recv1"></script>
     <script src="/admin/js/supplier.js?v=no-policy1"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {

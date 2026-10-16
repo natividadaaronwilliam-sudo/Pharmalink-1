@@ -929,6 +929,8 @@
     }
 
     function fetchLots() {
+        const body = document.getElementById('inventoryBody');
+        if (body) body.innerHTML = '<tr><td colspan="13" class="inv-empty">Loading...</td></tr>';
         const status = lotStatusFilter();
         const excludeExpired = status === 'active' ? '1' : '0';
         const params = new URLSearchParams({ status, exclude_expired: excludeExpired });
@@ -1388,6 +1390,7 @@
     window.computeSuggestedPrice = computeSuggestedPrice;
     window.fetchCategoryMarkups = fetchCategoryMarkups;
     window.fetchMasterDrugs = fetchMasterDrugs;
+    window.fetchLots = fetchLots;
     window.openDrugBarcodeScanner = openDrugBarcodeScanner;
 
     if (document.readyState === 'loading') {

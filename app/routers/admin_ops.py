@@ -367,7 +367,10 @@ def list_pos(request: Request, status: str = ""):
         JOIN suppliers s ON po.supplier_id = s.supplier_id
     """
     params = []
-    if status:
+    status = (status or "").strip()
+    if status.lower() == "open":
+        sql += " WHERE po.status IN ('Pending', 'Partially Received')"
+    elif status:
         sql += " WHERE po.status = %s"
         params.append(status)
     sql += " ORDER BY po.created_at DESC"
@@ -894,12 +897,19 @@ async def receive_delivery(request: Request):
     )}
     if not po_items:
         return {"success": False, "message": "Purchase order not found or has no items."}
+    remaining = {
+        pid: max(0, int(row["quantity_ordered"] or 0) - int(row["quantity_received"] or 0))
+        for pid, row in po_items.items()
+    }
     to_receive = []
     for it in data.get("items") or []:
         po_item_id = int(it.get("po_item_id") or 0)
         qty = int(it.get("quantity_received") or 0)
         if qty <= 0 or po_item_id not in po_items:
             continue
+        if qty > remaining.get(po_item_id, 0):
+            return {"success": False, "message": "Quantity cannot exceed the outstanding amount on this purchase order."}
+        remaining[po_item_id] = remaining[po_item_id] - qty
         lot_number = str(it.get("lot_number") or "").strip()
         expiration_date = it.get("expiration_date") or ""
         if not lot_number or not expiration_date:
